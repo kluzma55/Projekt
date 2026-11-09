@@ -1,0 +1,41 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div style="background-color: #ffe6e6; border: 3px solid #cc0000; padding: 25px; margin-bottom: 20px; border-radius: 8px;">
+    <h2 style="color: #cc0000; margin-top: 0;">⚠️ KRITICKÉ VAROVÁNÍ: TRVALÉ SMAZÁNÍ DAT ⚠️</h2>
+    <p>Chystáte se <strong>fyzicky a nenávratně zničit</strong> vybrané potraviny přímo ze SQL databáze.</p>
+    
+    <h3 style="color: #990000;">Následky této akce:</h3>
+    <ul style="color: #333; font-size: 14px;">
+        <li>Položky trvale zmizí ze serveru.</li>
+        <li>Společně s nimi se z databáze <strong>smaže i jejich historie v Changelogu</strong> (kvůli kaskádovému mazání CASCADE).</li>
+        <li>Mobilní aplikace nedostanou informaci o tom, že byly tyto položky smazány.</li>
+        <li>Pokud aplikujete tuto akci na potravinu, která už byla v minulosti vydána (Publish), <strong>hrozí rozbití konzistence dat</strong> u koncových uživatelů.</li>
+    </ul>
+
+    <p style="font-weight: bold; font-size: 16px;">Jste si naprosto jisti, že víte, co děláte?</p>
+</div>
+
+<form action="" method="post">
+    {% csrf_token %}
+    
+    {% for obj in queryset %}
+        <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk }}" />
+    {% endfor %}
+    
+    <input type="hidden" name="action" value="hard_delete_with_warning" />
+    <input type="hidden" name="apply" value="1" />
+    
+    <div style="margin-top: 20px;">
+        <input type="submit" value="Rozumím následkům, TRVALE SMAZAT" style="background: #cc0000; color: white; padding: 10px 20px; font-weight: bold; border: none; cursor: pointer; border-radius: 4px;" />
+        <a href="#" onclick="window.history.back(); return false;" style="margin-left: 15px; padding: 10px 20px; background: #eee; color: #333; text-decoration: none; border-radius: 4px;">Zrušit a vrátit se zpět</a>
+    </div>
+</form>
+
+<h3 style="margin-top: 40px;">Položky, které budou zničeny:</h3>
+<ul>
+    {% for obj in queryset %}
+        <li>{{ obj.name }} (ID: {{ obj.pk }})</li>
+    {% endfor %}
+</ul>
+{% endblock %}

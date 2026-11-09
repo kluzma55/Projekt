@@ -1,0 +1,17 @@
+{% extends "admin/index.html" %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* Skryje pravý panel Recent Actions */
+    #content-related {
+        display: none !important;
+    }
+
+    /* Roztáhne levý sloupec na celou šířku obrazovky */
+    .col-lg-9.col-12 {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+</style>
+{% endblock %}
