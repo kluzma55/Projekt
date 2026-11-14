@@ -85,7 +85,7 @@ class Food(models.Model):
                 fields_to_check = [
                     'name', 'ean', 'kcal_per_100', 'protein_g', 
                     'carbs_g', 'sugars_g', 'fat_g', 'saturated_fat_g', 
-                    'fibers_g', 'salt_g', 'is_active'
+                    'fibers_g', 'salt_g', 'is_active', 'image_path'
                 ]
                 
                 # Compare fields to find what exactly changed
@@ -93,17 +93,26 @@ class Food(models.Model):
                     old_val = getattr(old_obj, field)
                     new_val = getattr(self, field)
                     
-                    try:
-                        # Safely compare numeric values (e.g., Decimal) to avoid ghost updates like 744.00 != 744
-                        val1 = Decimal(str(old_val)).normalize() if old_val is not None else None
-                        val2 = Decimal(str(new_val)).normalize() if new_val is not None else None
-                        is_changed = (val1 != val2)
-                    except InvalidOperation:
-                        # Fallback for non-numeric fields (strings, booleans)
-                        is_changed = (old_val != new_val)
+                    if isinstance(self._meta.get_field(field), models.DecimalField):
+                        old_decimal = Decimal(str(old_val))
+                        new_decimal = Decimal(str(new_val))
 
-                    if is_changed:
-                        changed_data[field] = (str(old_val), str(new_val))
+                        is_changed = old_decimal != new_decimal
+
+                        if is_changed:
+                            changed_data[field] = (
+                                f"{old_decimal:.2f}",
+                                f"{new_decimal:.2f}"
+                            )
+
+                    else:
+                        is_changed = old_val != new_val
+
+                        if is_changed:
+                            changed_data[field] = (
+                                str(old_val), 
+                                str(new_val)
+                            )
                 
                 # If no tracked fields were changed (AND it's an existing item), exit logging
                 if not is_new and not changed_data:
@@ -177,7 +186,7 @@ class Food(models.Model):
                                     
                         # If all changes were reverted (ping-pong effect on all fields) 
                         # and the item is not deleted, the log is entirely redundant and should be removed.
-                        if not existing_log.new_values and existing_log.action == 'UPDATED':
+                        if not existing_log.new_values:
                             existing_log.delete()
                         else:
                             existing_log.save()
