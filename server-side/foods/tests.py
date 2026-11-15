@@ -10,6 +10,19 @@ from django.urls import reverse
 from .models import Food, DbVersion, Changelog
 from .services import normalize_openfoodfacts_item, run_food_etl
 
+def create_test_food(**kwargs):
+    defaults = {
+        "protein_g": 0,
+        "carbs_g": 0,
+        "sugars_g": 0,
+        "fat_g": 0,
+        "saturated_fat_g": 0,
+        "fibers_g": 0,
+        "salt_g": 0,
+    }
+    defaults.update(kwargs)
+    return Food.objects.create(**defaults)
+
 class ChangelogRobustnessTests(TestCase):
     
     def publish_current_version(self):
@@ -25,7 +38,7 @@ class ChangelogRobustnessTests(TestCase):
         nesmí nikdy generovat delta logy (old_values/new_values musí být prázdné).
         """
         # 1. Vytvoření
-        food = Food.objects.create(name="Jablko", kcal_per_100=50)
+        food = create_test_food(name="Jablko", kcal_per_100=50)
         log = Changelog.objects.get(food=food)
         
         self.assertEqual(log.action, 'CREATED', "Akce musí být CREATED.")
@@ -48,7 +61,7 @@ class ChangelogRobustnessTests(TestCase):
         KRITICKÝ TEST: Jakmile je položka z minulé verze upravena, 
         musí uložit správné delty a nastavit 'updated_in_version'.
         """
-        food = Food.objects.create(name="Banán", kcal_per_100=90)
+        food = create_test_food(name="Banán", kcal_per_100=90)
         v1 = self.publish_current_version()
 
         # Úprava ve Verzi 2
@@ -69,7 +82,7 @@ class ChangelogRobustnessTests(TestCase):
         KRITICKÝ TEST: Pokud uživatel změní hodnotu a pak ji ve stejné verzi vrátí zpět,
         záznam v logu se musí kompletně smazat (net-zero change).
         """
-        food = Food.objects.create(name="Ořechy", kcal_per_100=600)
+        food = create_test_food(name="Ořechy", kcal_per_100=600)
         self.publish_current_version()
 
         # Změna z 600 na 650 (Verze 2)
@@ -92,7 +105,7 @@ class ChangelogRobustnessTests(TestCase):
         KRITICKÝ TEST: Pokud uživatel změní 2 věci, ale vrátí zpět jen jednu z nich,
         log musí přežít, ale vrácená hodnota z něj musí zmizet.
         """
-        food = Food.objects.create(name="Mléko", kcal_per_100=40)
+        food = create_test_food(name="Mléko", kcal_per_100=40)
         self.publish_current_version()
 
         # Měníme dvě věci
@@ -117,7 +130,7 @@ class ChangelogRobustnessTests(TestCase):
         (jak v domovské verzi, tak v cizí verzi).
         """
         # A) V domovské verzi (vytvoření, smazání, obnova)
-        food = Food.objects.create(name="Tatranka", kcal_per_100=500)
+        food = create_test_food(name="Tatranka", kcal_per_100=500)
         
         food.is_active = False
         food.save()
@@ -148,7 +161,7 @@ class ChangelogRobustnessTests(TestCase):
         KRITICKÝ TEST: Změna formátu desetinného čísla (např. 744.00 na 744 nebo 744.0)
         nesmí vygenerovat vůbec žádný log, protože matematicky se nic nemění.
         """
-        food = Food.objects.create(name="Máslo", kcal_per_100=Decimal('744.00'))
+        food = create_test_food(name="Máslo", kcal_per_100=Decimal('744.00'))
         self.publish_current_version()
 
         # Přiřazení "jiného" typu téže hodnoty
