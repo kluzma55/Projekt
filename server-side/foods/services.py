@@ -98,6 +98,7 @@ def fetch_products_from_api(page: int = 1, page_size: int = 100) -> list[dict]:
     params = {
         "page": page,
         "page_size": page_size,
+        "sort_by": "last_modified_t",
         "fields": "code,product_name,product_name_cs,nutriments,image_front_small_url,image_url",
     }
     headers = {
@@ -166,15 +167,31 @@ def _process_batch(raw_products: list[dict], existing_by_ean: dict[str, Food], s
                     stats["skipped"] += 1
 
 
-def run_food_etl() -> dict[str, int]:
-    """Rychlá synchronizace jedné dávky (pro tlačítko v adminu a pravidelný cron)."""
-    raw_products = fetch_products_from_api(page=1, page_size=100)
+def run_food_etl(max_pages: int = 10) -> dict[str, int]:
+    """Stáhne všechny nově přidané a upravené potraviny od poslední synchronizace."""
     stats = {"created": 0, "updated": 0, "skipped": 0, "invalid": 0}
     existing_by_ean = {
         food.ean: food
         for food in Food.objects.filter(is_active=True).exclude(ean="")
     }
-    _process_batch(raw_products, existing_by_ean, stats)
+
+    for page in range(1, max_pages + 1):
+        raw_products = fetch_products_from_api(page=page, page_size=100)
+        if not raw_products:
+            break
+
+        prev_changes = stats["created"] + stats["updated"]
+        _process_batch(raw_products, existing_by_ean, stats)
+        new_changes = (stats["created"] + stats["updated"]) - prev_changes
+
+        # Jakmile stránka nepřinesla žádnou novou ani upravenou položku,
+        # všechny další stránky jsou ještě starší -> končíme.
+        if new_changes == 0:
+            break
+
+        if page < max_pages:
+            time.sleep(6.5)
+
     return stats
 
 
