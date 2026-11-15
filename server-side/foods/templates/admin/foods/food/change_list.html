@@ -1,0 +1,11 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools %}
+<div style="margin-bottom: 16px;">
+    <form method="post" action="{% url 'admin:foods_food_run_etl' %}">
+        {% csrf_token %}
+        <button type="submit" class="button default">Spustit import z OpenFoodFacts</button>
+    </form>
+</div>
+{{ block.super }}
+{% endblock %}
