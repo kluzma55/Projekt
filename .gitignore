@@ -10,6 +10,8 @@ db.sqlite3
 
 # Virtual env for Python
 venv/
+docs/
+exports/
 env/
 .venv/
 

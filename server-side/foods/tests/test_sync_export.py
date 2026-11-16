@@ -9,8 +9,8 @@ from contextlib import closing
 from django.core.management import call_command
 from django.test import TestCase
 
-from .models import DbVersion, Food
-from .sync_core import NUMBER_FIELDS
+from ..models import DbVersion, Food
+from ..services.sync_core import NUMBER_FIELDS
 
 
 class SyncExportIntegrationTest(TestCase):

@@ -6,7 +6,7 @@ from django.conf import settings
 from django.db import connection, transaction
 from django.db.models import Exists, OuterRef
 
-from .models import Changelog, DbVersion, Food
+from ..models import Changelog, DbVersion, Food
 from .sync_core import STATE_FIELDS, normalize_row, rewind, build_delta, write_delta, write_snapshot
 
 

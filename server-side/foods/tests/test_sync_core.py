@@ -4,7 +4,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-from foods.sync_core import (NUMBER_FIELDS, normalize_row, rewind, build_delta,
+from foods.services.sync_core import (NUMBER_FIELDS, normalize_row, rewind, build_delta,
                              write_delta, write_snapshot)
 
 
