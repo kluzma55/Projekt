@@ -8,9 +8,9 @@ from foods.services.sync_core import (NUMBER_FIELDS, normalize_row, rewind, buil
                              write_delta, write_snapshot)
 
 
-def food(id, name, kcal, active=True):
+def food(id, name, kcal, active=True, unit='g'):
     row = dict.fromkeys(NUMBER_FIELDS, '0.00')
-    row.update(id=id, ean=str(id).zfill(13), name=name, image_path='',
+    row.update(id=id, ean=str(id).zfill(13), name=name, unit=unit, image_path='',
                kcal_per_100=str(kcal), is_active=active)
     return normalize_row(row)
 
@@ -50,7 +50,7 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(build_delta({}, {3: food(3, 'C', 1, False)}, 1, 3)['changes'], [])
 
     def test_snapshot(self):
-        rows = [food(1, 'Jablko', 52), food(2, 'Rohlík', 300, False)]
+        rows = [food(1, 'Jablko', 52), food(2, 'Rohlík', 300, False), food(3, 'Mléko', 42, unit='ml')]
         with tempfile.TemporaryDirectory() as d:
             p = write_snapshot(rows, 7, d)
             self.assertEqual(p.name, 'snapshot_7.db.gz')
@@ -58,7 +58,10 @@ class ExportTests(unittest.TestCase):
             db_path.write_bytes(gzip.decompress(p.read_bytes()))
             db = sqlite3.connect(db_path)
             try:
-                self.assertEqual(db.execute('SELECT id, name FROM food').fetchall(), [(1, 'Jablko')])
+                self.assertEqual(db.execute('SELECT id, name FROM food').fetchall(),
+                                 [(1, 'Jablko'), (3, 'Mléko')])
+                self.assertEqual(db.execute('SELECT unit FROM food WHERE id=1').fetchone(), ('g',))
+                self.assertEqual(db.execute('SELECT unit FROM food WHERE id=3').fetchone(), ('ml',))
                 self.assertEqual(db.execute('SELECT version FROM db_version').fetchone(), (7,))
                 self.assertEqual(db.execute('PRAGMA user_version').fetchone(), (7,))
                 self.assertEqual(db.execute('PRAGMA integrity_check').fetchone(), ('ok',))

@@ -57,6 +57,12 @@ class Food(models.Model):
     fibers_g = models.DecimalField(max_digits=5, decimal_places=2)
     salt_g = models.DecimalField(max_digits=5, decimal_places=2)
 
+    # Unit of measurement for the food: grams or millilitres.
+    UNIT_G = 'g'
+    UNIT_ML = 'ml'
+    UNIT_CHOICES = [(UNIT_G, 'Gram'), (UNIT_ML, 'Mililiter')]
+    unit = models.CharField(max_length=2, choices=UNIT_CHOICES, default=UNIT_G)
+
     # Path or URL to the food's image stored in a cloud bucket (e.g. Cloudflare R2).
     image_path = models.CharField(max_length=255, blank=True)
 
@@ -97,7 +103,7 @@ class Food(models.Model):
 
     # All fields whose changes are eligible for Changelog entries.
     TRACKED_FIELDS = [
-        'name', 'ean', 'kcal_per_100', 'protein_g',
+        'name', 'ean', 'unit', 'kcal_per_100', 'protein_g',
         'carbs_g', 'sugars_g', 'fat_g', 'saturated_fat_g',
         'fibers_g', 'salt_g', 'is_active', 'image_path',
     ]

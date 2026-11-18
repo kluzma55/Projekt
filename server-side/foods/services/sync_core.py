@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 from decimal import Decimal
 
-TEXT_FIELDS = ('ean', 'name', 'image_path')
+TEXT_FIELDS = ('ean', 'name', 'unit', 'image_path')
 NUMBER_FIELDS = ('kcal_per_100', 'protein_g', 'carbs_g', 'sugars_g',
                  'fat_g', 'saturated_fat_g', 'fibers_g', 'salt_g')
 FOOD_FIELDS = ('id', *TEXT_FIELDS, *NUMBER_FIELDS)
