@@ -9,3 +9,7 @@ create migrations: python manage.py makemigrations
 migrate: python manage.py migrate
 
 Commands for git:
+
+pull: git pull
+new branch: git checkout -b new-branch-name
+push: git push -u origin new-branch-name

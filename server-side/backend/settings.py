@@ -126,3 +126,11 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'users.User'
+
+# ---------------------------------------------------------------------------
+# Cloudflare R2 public CDN base URL
+# ---------------------------------------------------------------------------
+# Used to construct download URLs for SQLite snapshots and JSON deltas.
+# Django never downloads, proxies, or serves the binary files directly —
+# it only assembles and returns these URL strings to mobile clients.
+R2_PUBLIC_URL = os.getenv("R2_PUBLIC_URL", "https://cdn.yourproject.com").rstrip("/")

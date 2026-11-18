@@ -370,6 +370,51 @@ class Food(models.Model):
                     })
 
 
+class SyncArtifact(models.Model):
+    """
+    Stores metadata for the binary sync artifacts (snapshot .db.gz and delta .json)
+    that are physically hosted on Cloudflare R2.
+
+    Django never serves these files itself — it only reads this table to build
+    public download URLs and to supply file_size_bytes / checksum to mobile clients.
+
+    One row per (version, artifact_type) pair.
+    """
+    SNAPSHOT = 'snapshot'
+    DELTA = 'delta'
+    ARTIFACT_TYPE_CHOICES = [
+        (SNAPSHOT, 'Snapshot'),
+        (DELTA, 'Delta'),
+    ]
+
+    version = models.ForeignKey(
+        DbVersion,
+        on_delete=models.CASCADE,
+        related_name='sync_artifacts',
+    )
+    artifact_type = models.CharField(max_length=10, choices=ARTIFACT_TYPE_CHOICES)
+
+    # For deltas only: the version the client must be on to apply this delta.
+    from_version = models.IntegerField(null=True, blank=True)
+
+    # Populated after the file is uploaded to R2.
+    file_size_bytes = models.BigIntegerField(null=True, blank=True)
+    checksum = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['version', 'artifact_type', 'from_version'],
+                name='unique_sync_artifact',
+            )
+        ]
+
+    def __str__(self):
+        if self.artifact_type == self.DELTA:
+            return f"Delta v{self.from_version}→v{self.version_id}"
+        return f"Snapshot v{self.version_id}"
+
+
 class Changelog(models.Model):
     """
     Records the delta (changes) of foods across database versions.
