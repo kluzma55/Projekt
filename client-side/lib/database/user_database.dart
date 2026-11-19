@@ -67,7 +67,8 @@ class UserDatabase {
         daily_kcal_goal REAL NOT NULL,
         daily_protein_goal REAL NOT NULL,
         daily_carbs_goal REAL NOT NULL,
-        daily_fat_goal REAL NOT NULL
+        daily_fat_goal REAL NOT NULL,
+        daily_water_goal_ml REAL NOT NULL
       )
     ''');
 
@@ -125,7 +126,7 @@ await db.execute('''
         protein_g REAL NOT NULL,
         carbs_g REAL NOT NULL,
         fat_g REAL NOT NULL,
-        water_ml REAL NOT NULL DEAULT 0.0,
+        water_ml REAL NOT NULL DEFAULT 0.0,
         meal_type TEXT NOT NULL,
         date TEXT NOT NULL
       )

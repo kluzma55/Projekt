@@ -43,6 +43,7 @@ class FoodDatabase {
         ean TEXT NOT NULL DEFAULT '',
         name TEXT NOT NULL,
         unit TEXT NOT NULL DEFAULT 'g',
+        image_path TEXT,
         kcal_per_100 REAL NOT NULL,
         protein_g REAL NOT NULL,
         carbs_g REAL NOT NULL,
@@ -53,7 +54,8 @@ class FoodDatabase {
         salt_g REAL NOT NULL,
         is_used INTEGER NOT NULL DEFAULT 0,
         meal_type TEXT NOT NULL DEFAULT 'ostatní',
-        FOREIGN KEY (updated_in_version_id) REFERENCES Dbversion (version) ON DELETE SET NULL
+        updated_in_version_id INTEGER,
+        FOREIGN KEY (updated_in_version_id) REFERENCES Dbversion (version)
       )
     ''');
 
@@ -117,7 +119,7 @@ Future<int> insertDbVersion(DbVersion dbVersion) async {
     final db = await database;
     final maps = await db.query(
       'Food',
-      where: 'is_used = 1 AND is_active = 1',
+      where: 'is_used = 1',
       orderBy: 'name ASC',
     );
     return maps.map((m) => Food.fromMap(m)).toList();
