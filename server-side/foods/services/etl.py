@@ -3,9 +3,13 @@ import time
 import requests
 import gzip
 import json
+import os
+import tempfile
+from django.db import transaction
+from django.db.models import Count, Q
 from django.conf import settings
 from django.db import transaction
-from ..models import Food
+from foods.models import Food
 
 NUTRITION_FIELDS = (
     "kcal_per_100",
@@ -21,6 +25,7 @@ NUTRITION_FIELDS = (
 TRACKED_FIELDS = ("name", "ean", *NUTRITION_FIELDS)
 
 DEFAULT_OFF_SEARCH_URL = "https://cz.openfoodfacts.org/api/v2/search"
+DEFAULT_OFF_DUMP_URL = "https://static.openfoodfacts.org/data/openfoodfacts-products.jsonl.gz"
 
 
 def _parse_decimal(value, *, max_val: Decimal, default: Decimal | None = None) -> Decimal | None:
@@ -47,33 +52,54 @@ def _parse_optional_nutrient(value) -> Decimal:
 def normalize_openfoodfacts_item(raw: dict) -> dict | None:
     """
     Vyčistí jeden záznam z OpenFoodFacts.
-    Povinné: validní EAN (8/13 číslic), název a kalorie (kcal_per_100).
+    Povinné: validní EAN (8/13 číslic), název a energetická hodnota (kcal nebo přepočet z kJ).
     Ostatní atributy jsou nepovinné (výchozí 0.00 / prázdný řetězec).
     """
     ean = str(raw.get("code") or raw.get("ean") or "").strip()
-    name = str(raw.get("product_name_cs") or raw.get("product_name") or "").strip()
+    if len(ean) == 14 and ean.startswith("0"):
+        ean = ean[1:]
+
+    name = str(
+        raw.get("product_name_cs")
+        or raw.get("product_name")
+        or raw.get("product_name_sk")
+        or raw.get("product_name_en")
+        or raw.get("generic_name_cs")
+        or ""
+    ).strip()
 
     if not ean.isdigit() or len(ean) not in (8, 13) or not name:
         return None
 
     nutriments = raw.get("nutriments") or {}
 
-    # Jediná povinná nutriční hodnota jsou kalorie
+    # 1. Zkusíme přímo kcal
     kcal = _parse_decimal(nutriments.get("energy-kcal_100g"), max_val=Decimal("9999.99"))
+
+    # 2. Fallback: přepočet z kJ (velmi časté u českých/EU výrobků v OFF)
+    if kcal is None:
+        energy_unit = str(nutriments.get("energy_unit") or "").lower()
+        if energy_unit == "kcal" and nutriments.get("energy_100g") is not None:
+            kcal = _parse_decimal(nutriments.get("energy_100g"), max_val=Decimal("9999.99"))
+        else:
+            kj_raw = nutriments.get("energy-kj_100g")
+            if kj_raw is None:
+                kj_raw = nutriments.get("energy_100g")
+            kj = _parse_decimal(kj_raw, max_val=Decimal("41840.00"))
+            if kj is not None:
+                kcal = (kj / Decimal("4.184")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
     if kcal is None:
         return None
 
-    # Nepovinné atributy (uloží se, pokud existují, jinak 0.00)
-    sugars = _parse_decimal(nutriments.get("sugars_100g"), max_val=Decimal("100.00"), default=Decimal("0.00"))
-    protein = _parse_decimal(nutriments.get("proteins_100g"), max_val=Decimal("100.00"), default=Decimal("0.00"))
-    carbs = _parse_decimal(nutriments.get("carbohydrates_100g"), max_val=Decimal("100.00"), default=Decimal("0.00"))
-    fat = _parse_decimal(nutriments.get("fat_100g"), max_val=Decimal("100.00"), default=Decimal("0.00"))
-    saturated_fat = _parse_decimal(nutriments.get("saturated-fat_100g"), max_val=Decimal("100.00"), default=Decimal("0.00"))
-    fibers = _parse_decimal(nutriments.get("fiber_100g"), max_val=Decimal("100.00"), default=Decimal("0.00"))
-    salt = _parse_decimal(nutriments.get("salt_100g"), max_val=Decimal("100.00"), default=Decimal("0.00"))
-
-    if None in (protein, carbs, fat, sugars, saturated_fat, fibers, salt):
-        return None
+    # Nepovinné atributy (uloží se, pokud jsou v rozumném rozsahu, jinak 0.00)
+    sugars = _parse_optional_nutrient(nutriments.get("sugars_100g"))
+    protein = _parse_optional_nutrient(nutriments.get("proteins_100g"))
+    carbs = _parse_optional_nutrient(nutriments.get("carbohydrates_100g"))
+    fat = _parse_optional_nutrient(nutriments.get("fat_100g"))
+    saturated_fat = _parse_optional_nutrient(nutriments.get("saturated-fat_100g"))
+    fibers = _parse_optional_nutrient(nutriments.get("fiber_100g"))
+    salt = _parse_optional_nutrient(nutriments.get("salt_100g"))
 
     image_url = str(raw.get("image_front_small_url") or raw.get("image_url") or "").strip()
 
@@ -255,8 +281,46 @@ def is_czech_product(raw: dict) -> bool:
     return code.startswith("859")
 
 
-def run_dump_food_etl(file_path: str, on_progress=None) -> dict[str, int]:
-    """Načte lokální .jsonl.gz export z OpenFoodFacts a uloží validní české potraviny."""
+def download_off_dump(dest_path: str, url: str = DEFAULT_OFF_DUMP_URL, on_download_progress=None) -> str:
+    """Stáhne aktuální hromadný .jsonl.gz export z Open Food Facts na disk."""
+    headers = {
+        "User-Agent": "KalorickaKalkulacka-StudentProject/1.0 (contact@example.com)",
+    }
+    with requests.get(url, stream=True, timeout=(10, 60), headers=headers) as response:
+        response.raise_for_status()
+        total_bytes = int(response.headers.get("Content-Length", 0))
+        downloaded = 0
+        last_reported_mb = 0
+
+        with open(dest_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    current_mb = downloaded // (100 * 1024 * 1024)
+                    if on_download_progress and current_mb > last_reported_mb:
+                        last_reported_mb = current_mb
+                        on_download_progress(downloaded, total_bytes)
+    return dest_path
+
+
+def run_dump_food_etl(
+    file_path: str | None = None,
+    keep_file: bool = False,
+    on_progress=None,
+    on_download_progress=None,
+) -> dict[str, int]:
+    """
+    Načte lokální nebo automaticky stažený .jsonl.gz export z OpenFoodFacts
+    a uloží validní české potraviny do databáze.
+    """
+    temp_file_created = False
+    if not file_path:
+        fd, temp_path = tempfile.mkstemp(prefix="off_dump_", suffix=".jsonl.gz")
+        os.close(fd)
+        file_path = download_off_dump(temp_path, on_download_progress=on_download_progress)
+        temp_file_created = True
+
     stats = {"created": 0, "updated": 0, "skipped": 0, "invalid": 0}
     existing_by_ean = {
         food.ean: food
@@ -266,32 +330,67 @@ def run_dump_food_etl(file_path: str, on_progress=None) -> dict[str, int]:
     batch = []
     batch_num = 0
 
-    with gzip.open(file_path, "rt", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
+    try:
+        with gzip.open(file_path, "rt", encoding="utf-8") as f:
+            for line in f:
+                # Rychlé textové předfiltrování (přeskočí ~99 % ne-českých řádků bez parsování JSONu)
+                if '"en:czech' not in line and '"product_name_cs"' not in line and '859' not in line:
+                    continue
 
-            try:
-                raw = json.loads(line)
-            except json.JSONDecodeError:
-                continue
+                line = line.strip()
+                if not line:
+                    continue
 
-            if not is_czech_product(raw):
-                continue
+                try:
+                    raw = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
 
-            batch.append(raw)
-            if len(batch) >= 500:
-                _process_batch(batch, existing_by_ean, stats)
-                batch.clear()
-                batch_num += 1
-                if on_progress:
-                    on_progress(batch_num, stats)
+                if not is_czech_product(raw):
+                    continue
 
-    if batch:
-        _process_batch(batch, existing_by_ean, stats)
-        batch_num += 1
-        if on_progress:
-            on_progress(batch_num, stats)
+                batch.append(raw)
+                if len(batch) >= 500:
+                    _process_batch(batch, existing_by_ean, stats)
+                    batch.clear()
+                    batch_num += 1
+                    if on_progress:
+                        on_progress(batch_num, stats)
+
+        if batch:
+            _process_batch(batch, existing_by_ean, stats)
+            batch_num += 1
+            if on_progress:
+                on_progress(batch_num, stats)
+    finally:
+        if temp_file_created and not keep_file and os.path.exists(file_path):
+            os.remove(file_path)
 
     return stats
+
+
+def verify_food_database_quality() -> dict[str, int]:
+    """Zkontroluje integritu dat v databázi (duplicity EAN, chybějící povinná pole)."""
+    active = Food.objects.filter(is_active=True)
+    duplicate_eans = (
+        active.exclude(ean="")
+        .values("ean")
+        .annotate(c=Count("id"))
+        .filter(c__gt=1)
+        .count()
+    )
+    bad_ean_count = sum(
+        1 for ean in active.values_list("ean", flat=True)
+        if not ean or not ean.isdigit() or len(ean) not in (8, 13)
+    )
+    missing_required = active.filter(
+        Q(name__isnull=True) | Q(name="") |
+        Q(kcal_per_100__isnull=True) | Q(kcal_per_100__lt=0) | Q(kcal_per_100__gt=9999.99)
+    ).count()
+
+    return {
+        "total_active": active.count(),
+        "duplicate_eans": duplicate_eans,
+        "invalid_eans": bad_ean_count,
+        "missing_required_fields": missing_required,
+    }
