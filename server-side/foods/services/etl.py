@@ -118,26 +118,26 @@ def normalize_openfoodfacts_item(raw: dict) -> dict | None:
     }
 
 
-def fetch_products_from_api(page: int = 1, page_size: int = 100) -> list[dict]:
+def fetch_products_from_api(page: int = 1, page_size: int = 100, max_retries: int = 3) -> list[dict]:
     """Stáhne jednu stránku dat z OpenFoodFacts API v2."""
     source_url = getattr(settings, "FOOD_ETL_SOURCE_URL", DEFAULT_OFF_SEARCH_URL)
     params = {
         "page": page,
         "page_size": page_size,
         "sort_by": "last_modified_t",
-        "fields": "code,product_name,product_name_cs,nutriments,image_front_small_url,image_url",
+        "fields": "code,product_name,product_name_cs,product_name_sk,product_name_en,nutriments,image_front_small_url,image_url",
     }
     headers = {
-        "User-Agent": "KalorickaKalkulacka-StudentProject/1.0 (contact@example.com)",
+        "User-Agent": "KalorickaKalkulacka-StudentProject/1.0 (contact: lukas.zvonicek.s01@osu.cz)",
         "Accept": "application/json",
     }
 
     last_exception = None
-    for attempt in range(1, 6):
+    for attempt in range(1, max_retries + 1):
         try:
-            response = requests.get(source_url, params=params, timeout=(5, 30), headers=headers)
-            if response.status_code in (429, 502, 503, 504) and attempt < 5:
-                time.sleep(3 * attempt)
+            response = requests.get(source_url, params=params, timeout=(5, 12), headers=headers)
+            if response.status_code in (429, 502, 503, 504) and attempt < max_retries:
+                time.sleep(1.5 * attempt)
                 continue
             response.raise_for_status()
             payload = response.json()
@@ -149,13 +149,12 @@ def fetch_products_from_api(page: int = 1, page_size: int = 100) -> list[dict]:
             raise ValueError("Neočekávaný formát odpovědi z externího API.")
         except requests.RequestException as exc:
             last_exception = exc
-            if attempt < 5:
-                time.sleep(3 * attempt)
+            if attempt < max_retries:
+                time.sleep(1.5 * attempt)
                 continue
             raise
 
     raise last_exception
-
 
 def _process_batch(raw_products: list[dict], existing_by_ean: dict[str, Food], stats: dict[str, int]) -> None:
     """Očistí a uloží jednu dávku produktů v rámci jedné databázové transakce."""
@@ -193,8 +192,11 @@ def _process_batch(raw_products: list[dict], existing_by_ean: dict[str, Food], s
                     stats["skipped"] += 1
 
 
-def run_food_etl(max_pages: int = 10) -> dict[str, int]:
-    """Stáhne všechny nově přidané a upravené potraviny od poslední synchronizace."""
+def run_food_etl(max_pages: int = 3, page_delay: float = 1.5) -> dict[str, int]:
+    """
+    Stáhne nejnověji přidané a upravené potraviny z OFF API (delta sync).
+    Výchozí limit 3 stránky (300 položek) zajišťuje rychlý běh bez HTTP timeoutu v adminu.
+    """
     stats = {"created": 0, "updated": 0, "skipped": 0, "invalid": 0}
     existing_by_ean = {
         food.ean: food
@@ -202,7 +204,15 @@ def run_food_etl(max_pages: int = 10) -> dict[str, int]:
     }
 
     for page in range(1, max_pages + 1):
-        raw_products = fetch_products_from_api(page=page, page_size=100)
+        try:
+            raw_products = fetch_products_from_api(page=page, page_size=100)
+        except requests.RequestException:
+            # Pokud už proběhla alespoň 1. stránka a OFF API dočasně vrátí 503,
+            # uložená data z předchozích stránek zachováme a skončíme bez pádu.
+            if page > 1:
+                break
+            raise
+
         if not raw_products:
             break
 
@@ -210,16 +220,13 @@ def run_food_etl(max_pages: int = 10) -> dict[str, int]:
         _process_batch(raw_products, existing_by_ean, stats)
         new_changes = (stats["created"] + stats["updated"]) - prev_changes
 
-        # Jakmile stránka nepřinesla žádnou novou ani upravenou položku,
-        # všechny další stránky jsou ještě starší -> končíme.
         if new_changes == 0:
             break
 
-        if page < max_pages:
-            time.sleep(6.5)
+        if page < max_pages and page_delay > 0:
+            time.sleep(page_delay)
 
     return stats
-
 
 def run_full_food_etl(
     start_page: int = 1,

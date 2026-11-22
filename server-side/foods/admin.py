@@ -138,7 +138,7 @@ class FoodAdmin(admin.ModelAdmin):
         if request.method != 'POST':
             return HttpResponseRedirect(reverse('admin:foods_food_changelist'))
         try:
-            stats = run_food_etl()
+            stats = run_food_etl(max_pages=3)
             self.message_user(
                 request,
                 f"Import z OpenFoodFacts dokončen – vytvořeno: {stats['created']}, "
