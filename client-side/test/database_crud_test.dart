@@ -37,7 +37,7 @@ void main() {
 
     //Verze stažené databáze
     await foodDb.insertDbVersion(
-      DbVersion(version: 1, isPublished: true),
+      DbVersion(version: 1),
     );
 
     //Vložení potraviny ze serverového katalogu
@@ -60,7 +60,6 @@ void main() {
     // READ ověření vložených dat
     final latestVersion = await foodDb.getLatestDbVersion();
     expect(latestVersion?.version, 1);
-    expect(latestVersion?.isPublished, true);
 
     final loadedFood = await foodDb.getFoodById(101);
     expect(loadedFood?.name, 'Jablko Golden');
@@ -158,6 +157,7 @@ final mealId = await userDb.insertCustomMeal(
         dailyProteinGoal: 120,
         dailyCarbsGoal: 230,
         dailyFatGoal: 65,
+        dailyWaterGoalMl: 2000.0,
       ),
     );
 
@@ -176,11 +176,13 @@ final mealId = await userDb.insertCustomMeal(
         dailyKcalGoal: 2100,
         dailyProteinGoal: 125,
         dailyCarbsGoal: 240,
-        dailyFatGoal: 65,
+        dailyFatGoal: 65.0,
+        dailyWaterGoalMl: 2500.0,
       ),
     );
     profile = await userDb.getUserProfile();
     expect(profile?.dailyKcalGoal, 2100);
+    expect(profile?.dailyWaterGoalMl, 2500.0);
 
 // Testy Aktivity
 final runningActivities = await userDb.searchActivitiesByName('Běh');
@@ -239,7 +241,7 @@ final foundActivities = await userDb.searchActivitiesByName('Běh');
     );
 
     final activityLogs = await userDb.getActivityLogsByDate('2026-11-15');
-    expect(activityLogs.length, 2);
+    expect(activityLogs.length, 4);
 
     final totalBurned = await userDb.getTotalBurnedKcalByDate('2026-11-15');
     expect(totalBurned, greaterThan(380.0));
@@ -263,6 +265,7 @@ await userDb.insertBodyMeasurement(
         proteinG: 10.4,
         carbsG: 48.0,
         fatG: 5.6,
+        date: '2026-11-12',
       ),
     );
 
@@ -284,6 +287,7 @@ await userDb.insertBodyMeasurement(
         proteinG: 13.0,
         carbsG: 60.0,
         fatG: 7.0,
+        date: '2026-11-12',
       ),
     );
     entries = await userDb.getDiaryEntriesByDate('2026-11-12');

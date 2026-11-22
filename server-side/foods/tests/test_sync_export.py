@@ -9,15 +9,15 @@ from contextlib import closing
 from django.core.management import call_command
 from django.test import TestCase
 
-from .models import DbVersion, Food
-from .sync_core import NUMBER_FIELDS
+from ..models import DbVersion, Food
+from ..services.sync_core import NUMBER_FIELDS
 
 
 class SyncExportIntegrationTest(TestCase):
-    def make_food(self, name, ean, kcal):
+    def make_food(self, name, ean, kcal, unit='g'):
         values = dict.fromkeys(NUMBER_FIELDS, 0)
         values['kcal_per_100'] = kcal
-        return Food.objects.create(name=name, ean=ean, **values)
+        return Food.objects.create(name=name, ean=ean, unit=unit, **values)
 
     def publish(self):
         version = DbVersion.objects.get(is_published=False)

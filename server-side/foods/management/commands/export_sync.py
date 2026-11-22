@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand, CommandError
-from foods.sync_export import export_delta, export_snapshot
+from foods.services.sync_export import export_delta, export_snapshot
 
 
 class Command(BaseCommand):

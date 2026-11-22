@@ -5,7 +5,7 @@ import gzip
 import json
 from django.conf import settings
 from django.db import transaction
-from .models import Food
+from ..models import Food
 
 NUTRITION_FIELDS = (
     "kcal_per_100",

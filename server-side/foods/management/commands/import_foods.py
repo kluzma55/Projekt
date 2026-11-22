@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand, CommandError
-from foods.services import run_dump_food_etl, run_food_etl, run_full_food_etl
+from foods.services.etl import run_dump_food_etl, run_food_etl, run_full_food_etl
 
 
 class Command(BaseCommand):

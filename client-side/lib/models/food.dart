@@ -3,6 +3,7 @@ class Food {
   final String ean;
   final String name;
   final String unit; //'g' nebo 'ml'
+  final String imagePath;
   final double kcalPer100;
   final double proteinG;
   final double carbsG;
@@ -18,6 +19,7 @@ class Food {
     this.ean = '',
     required this.name,
     this.unit = 'g',
+    this.imagePath = '',
     required this.kcalPer100,
     required this.proteinG,
     required this.carbsG,
@@ -35,6 +37,7 @@ class Food {
       'ean': ean,
       'name': name,
       'unit': unit,
+      'image_path': imagePath,
       'kcal_per_100': kcalPer100,
       'protein_g': proteinG,
       'carbs_g': carbsG,
@@ -53,6 +56,7 @@ class Food {
       ean: (map['ean'] as String?) ?? '',
       name: map['name'] as String,
       unit: (map['unit'] as String?) ?? 'g',
+      imagePath: (map['image_path'] as String?) ?? '',
       kcalPer100: (map['kcal_per_100'] as num).toDouble(),
       proteinG: (map['protein_g'] as num).toDouble(),
       carbsG: (map['carbs_g'] as num).toDouble(),
@@ -70,6 +74,7 @@ class Food {
     String? ean,
     String? name,
     String? unit,
+    String? imagePath,
     double? kcalPer100,
     double? proteinG,
     double? carbsG,
@@ -85,6 +90,7 @@ class Food {
       ean: ean ?? this.ean,
       name: name ?? this.name,
       unit: unit ?? this.unit,
+      imagePath: imagePath ?? this.imagePath,
       kcalPer100: kcalPer100 ?? this.kcalPer100,
       proteinG: proteinG ?? this.proteinG,
       carbsG: carbsG ?? this.carbsG,

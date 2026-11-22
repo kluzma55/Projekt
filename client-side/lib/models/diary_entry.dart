@@ -27,6 +27,7 @@ class DiaryEntry {
   final double fatG;
   final double waterMl;
   final String mealType; //snídaně, dopolední svačina, oběd,...
+  final String date; // Datum přidání záznamu
   
   DiaryEntry({
     this.id,
@@ -41,6 +42,7 @@ class DiaryEntry {
     required this.fatG,
     this.waterMl = 0.0,
     String? mealType,
+    required this.date,
   }) : mealType = (mealType != null && mealType.trim(). isNotEmpty)
         ? mealType
         : other; //Automaticky doplní "Ostatní", pokud uživatel nic nevybere
@@ -60,6 +62,7 @@ class DiaryEntry {
       'fat_g': fatG,
       'water_ml': waterMl,
       'meal_type': mealType,
+      'date': date,
     };
   }
 
@@ -80,6 +83,7 @@ class DiaryEntry {
       mealType: (rawMealType != null && rawMealType.isNotEmpty)
           ? rawMealType
           : other,
+      date: map['date'] as String,
     );
   }
 }
