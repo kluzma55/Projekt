@@ -1,16 +1,31 @@
 from django.core.management.base import BaseCommand, CommandError
-from foods.services.etl import run_dump_food_etl, run_food_etl, run_full_food_etl
+from foods.services.etl import (
+    run_dump_food_etl,
+    run_food_etl,
+    run_full_food_etl,
+    verify_food_database_quality,
+)
 
 
 class Command(BaseCommand):
-    help = "Spustí synchronizaci databáze potravin z OpenFoodFacts (UC14 / E7)."
+    help = "Spustí synchronizaci databáze potravin z OpenFoodFacts (UC14 / E6)."
 
     def add_arguments(self, parser):
+        parser.add_argument(
+            "--dump",
+            action="store_true",
+            help="Stáhne aktuální hromadný export .jsonl.gz z OpenFoodFacts a provede kompletní import.",
+        )
         parser.add_argument(
             "--file",
             type=str,
             default=None,
             help="Cesta k lokálnímu exportnímu souboru .jsonl.gz z OpenFoodFacts.",
+        )
+        parser.add_argument(
+            "--keep-file",
+            action="store_true",
+            help="Při použití --dump nesmaže stažený .jsonl.gz soubor po dokončení.",
         )
         parser.add_argument(
             "--full",
@@ -40,10 +55,24 @@ class Command(BaseCommand):
                 f"zahozeno nevalidních: {stats['invalid']}"
             )
 
+        def print_download(downloaded, total):
+            mb_done = downloaded / (1024 * 1024)
+            if total > 0:
+                pct = (downloaded / total) * 100
+                self.stdout.write(f"Stahuji export OFF: {mb_done:.0f} MB ({pct:.1f} %)")
+            else:
+                self.stdout.write(f"Stahuji export OFF: {mb_done:.0f} MB")
+
         try:
-            if options["file"]:
-                self.stdout.write(f"Spouštím import ze souboru {options['file']}...")
-                stats = run_dump_food_etl(file_path=options["file"], on_progress=print_progress)
+            if options["dump"] or options["file"]:
+                source_label = options["file"] if options["file"] else "online hromadného exportu OFF"
+                self.stdout.write(f"Spouštím kompletní import z {source_label}...")
+                stats = run_dump_food_etl(
+                    file_path=options["file"],
+                    keep_file=options["keep_file"],
+                    on_progress=print_progress,
+                    on_download_progress=print_download,
+                )
             elif options["full"]:
                 self.stdout.write("Spouštím import z API po stránkách...")
                 stats = run_full_food_etl(
@@ -65,3 +94,12 @@ class Command(BaseCommand):
                 f"zahozeno nevalidních: {stats['invalid']}"
             )
         )
+
+        if options["dump"] or options["file"]:
+            quality = verify_food_database_quality()
+            self.stdout.write(
+                f"Kontrola kvality DB | aktivních položek: {quality['total_active']}, "
+                f"duplicitní EAN: {quality['duplicate_eans']}, "
+                f"nevalidní EAN: {quality['invalid_eans']}, "
+                f"chybějící povinná pole: {quality['missing_required_fields']}"
+            )

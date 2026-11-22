@@ -4,7 +4,7 @@
 <div style="margin-bottom: 16px;">
     <form method="post" action="{% url 'admin:foods_food_run_etl' %}">
         {% csrf_token %}
-        <button type="submit" class="button default">Spustit import z OpenFoodFacts</button>
+        <button type="submit" class="button default">Spustit update databáze potravin</button>
     </form>
 </div>
 {{ block.super }}
