@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
+
+import '../widgets/bottom_navigation.dart';
 
 import '../models/activity_log.dart';
 
@@ -404,23 +405,7 @@ class _CustomActivityScreenState extends State<CustomActivityScreen> {
         ),
       ),
 
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: background,
-          border: Border(top: BorderSide(color: borderColor)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Row(
-            children: [
-              _navigationItem(CupertinoIcons.house, 'Dnes'),
-              _navigationItem(CupertinoIcons.book, 'Deník', selected: true),
-              _navigationItem(CupertinoIcons.chart_bar, 'Přehled'),
-              _navigationItem(CupertinoIcons.person, 'Profil'),
-            ],
-          ),
-        ),
-      ),
+      bottomNavigationBar: const AppBottomNavigation(selectedIndex: 1),
     );
   }
 
@@ -493,39 +478,6 @@ class _CustomActivityScreenState extends State<CustomActivityScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _navigationItem(IconData icon, String label, {bool selected = false}) {
-    final color = selected ? green : const Color(0xFF858B80);
-
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 58,
-              height: 34,
-              decoration: BoxDecoration(
-                color: selected ? lightGreen : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: color,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
