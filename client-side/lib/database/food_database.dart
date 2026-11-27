@@ -63,7 +63,7 @@ class FoodDatabase {
     await db.execute('CREATE INDEX idx_food_name ON Food (name)');
   }
 
-  // --- CRUD pro Dbversion ---
+  // --- CRUD for Dbversion ---
 
 Future<int> insertDbVersion(DbVersion dbVersion) async {
     final db = await database;
@@ -78,7 +78,7 @@ Future<int> insertDbVersion(DbVersion dbVersion) async {
     return DbVersion.fromMap(maps.first);
   }
 
-  // --- CRUD pro Food ---
+  // --- CRUD for Food ---
 
   Future<int> insertFood(Food food) async {
     final db = await database;
@@ -97,7 +97,7 @@ Future<int> insertDbVersion(DbVersion dbVersion) async {
     final db = await database;
     final maps = await db.query(
       'Food',
-      where: 'ean = ? AND is_active = 1',
+      where: 'ean = ?',
       whereArgs: [ean],
       limit: 1,
     );
@@ -105,11 +105,10 @@ Future<int> insertDbVersion(DbVersion dbVersion) async {
     return Food.fromMap(maps.first);
   }
 
-  Future<List<Food>> getAllFoods({bool onlyActive = true}) async {
+  Future<List<Food>> getAllFoods() async {
     final db = await database;
     final maps = await db.query(
       'Food',
-      where: onlyActive ? 'is_active = 1' : null,
       orderBy: 'name ASC',
     );
     return maps.map((m) => Food.fromMap(m)).toList();
@@ -129,7 +128,7 @@ Future<int> insertDbVersion(DbVersion dbVersion) async {
     final db = await database;
     final maps = await db.query(
       'Food',
-      where: 'name LIKE ? AND is_active = 1',
+      where: 'name LIKE ?',
       whereArgs: ['%$query%'],
       orderBy: 'is_used DESC, name ASC',
     );

@@ -1,7 +1,7 @@
 class WaterLog {
   final int? id;
-  final double amountMl; // Objem v ml (např. 250.0)
-  final String date;     // Datum ve formátu 'YYYY-MM-DD'
+  final double amountMl; // Volume in ml (e.g. 250.0)
+  final String date;     // Date in 'YYYY-MM-DD' format
 
   WaterLog({
     this.id,

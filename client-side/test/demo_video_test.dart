@@ -15,7 +15,7 @@ void main() {
       final dbFile = File(dbPath);
       if (await dbFile.exists()) await dbFile.delete();
 
-      // KROK 1: Prázdná databáze
+      // STEP 1: Empty database
       var db = await openDatabase(
         dbPath,
         version: 1,

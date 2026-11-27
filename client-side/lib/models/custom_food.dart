@@ -2,7 +2,7 @@ class CustomFood {
   final int? id;
   final String ean;
   final String name;
-  final String unit; // 'g' nebo 'ml'
+  final String unit; // 'g' or 'ml'
   final double kcalPer100;
   final double proteinG;
   final double carbsG;

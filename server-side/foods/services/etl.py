@@ -44,16 +44,16 @@ def _parse_decimal(value, *, max_val: Decimal, default: Decimal | None = None) -
 
 
 def _parse_optional_nutrient(value) -> Decimal:
-    """Vrátí hodnotu živiny v g/100g, nebo 0.00 pokud chybí či je mimo rozsah."""
+    """Returns nutrient value in g/100g, or 0.00 if missing or out of range."""
     parsed = _parse_decimal(value, max_val=Decimal("100.00"), default=Decimal("0.00"))
     return parsed if parsed is not None else Decimal("0.00")
 
 
 def normalize_openfoodfacts_item(raw: dict) -> dict | None:
     """
-    Vyčistí jeden záznam z OpenFoodFacts.
-    Povinné: validní EAN (8/13 číslic), název a energetická hodnota (kcal nebo přepočet z kJ).
-    Ostatní atributy jsou nepovinné (výchozí 0.00 / prázdný řetězec).
+    Cleans a single record from OpenFoodFacts.
+    Required: valid EAN (8/13 digits), name, and energy value (kcal or conversion from kJ).
+    Other attributes are optional (default 0.00 / empty string).
     """
     ean = str(raw.get("code") or raw.get("ean") or "").strip()
     if len(ean) == 14 and ean.startswith("0"):
@@ -73,10 +73,10 @@ def normalize_openfoodfacts_item(raw: dict) -> dict | None:
 
     nutriments = raw.get("nutriments") or {}
 
-    # 1. Zkusíme přímo kcal
+    # 1. Try kcal directly
     kcal = _parse_decimal(nutriments.get("energy-kcal_100g"), max_val=Decimal("9999.99"))
 
-    # 2. Fallback: přepočet z kJ (velmi časté u českých/EU výrobků v OFF)
+    # 2. Fallback: conversion from kJ (very common for Czech/EU products in OFF)
     if kcal is None:
         energy_unit = str(nutriments.get("energy_unit") or "").lower()
         if energy_unit == "kcal" and nutriments.get("energy_100g") is not None:
@@ -92,7 +92,7 @@ def normalize_openfoodfacts_item(raw: dict) -> dict | None:
     if kcal is None:
         return None
 
-    # Nepovinné atributy (uloží se, pokud jsou v rozumném rozsahu, jinak 0.00)
+    # Optional attributes (saved if within reasonable range, otherwise 0.00)
     sugars = _parse_optional_nutrient(nutriments.get("sugars_100g"))
     protein = _parse_optional_nutrient(nutriments.get("proteins_100g"))
     carbs = _parse_optional_nutrient(nutriments.get("carbohydrates_100g"))
@@ -119,7 +119,7 @@ def normalize_openfoodfacts_item(raw: dict) -> dict | None:
 
 
 def fetch_products_from_api(page: int = 1, page_size: int = 100, max_retries: int = 3) -> list[dict]:
-    """Stáhne jednu stránku dat z OpenFoodFacts API v2."""
+    """Fetches one page of data from OpenFoodFacts API v2."""
     source_url = getattr(settings, "FOOD_ETL_SOURCE_URL", DEFAULT_OFF_SEARCH_URL)
     params = {
         "page": page,
@@ -157,7 +157,7 @@ def fetch_products_from_api(page: int = 1, page_size: int = 100, max_retries: in
     raise last_exception
 
 def _process_batch(raw_products: list[dict], existing_by_ean: dict[str, Food], stats: dict[str, int]) -> None:
-    """Očistí a uloží jednu dávku produktů v rámci jedné databázové transakce."""
+    """Cleans and saves a single batch of products within a single database transaction."""
     with transaction.atomic():
         for raw in raw_products:
             cleaned = normalize_openfoodfacts_item(raw)
@@ -194,8 +194,8 @@ def _process_batch(raw_products: list[dict], existing_by_ean: dict[str, Food], s
 
 def run_food_etl(max_pages: int = 3, page_delay: float = 1.5) -> dict[str, int]:
     """
-    Stáhne nejnověji přidané a upravené potraviny z OFF API (delta sync).
-    Výchozí limit 3 stránky (300 položek) zajišťuje rychlý běh bez HTTP timeoutu v adminu.
+    Fetches the most recently added and updated foods from OFF API (delta sync).
+    Default limit of 3 pages (300 items) ensures fast execution without HTTP timeout in admin.
     """
     stats = {"created": 0, "updated": 0, "skipped": 0, "invalid": 0}
     existing_by_ean = {
@@ -207,8 +207,8 @@ def run_food_etl(max_pages: int = 3, page_delay: float = 1.5) -> dict[str, int]:
         try:
             raw_products = fetch_products_from_api(page=page, page_size=100)
         except requests.RequestException:
-            # Pokud už proběhla alespoň 1. stránka a OFF API dočasně vrátí 503,
-            # uložená data z předchozích stránek zachováme a skončíme bez pádu.
+            # If at least page 1 has completed and OFF API temporarily returns 503,
+            # keep saved data from previous pages and finish without crashing.
             if page > 1:
                 break
             raise
@@ -233,7 +233,7 @@ def run_full_food_etl(
     max_pages: int | None = None,
     on_progress=None,
 ) -> dict[str, int]:
-    """Kompletní prvotní import všech validních českých výrobků přes všechny stránky API."""
+    """Complete initial import of all valid Czech products across all API pages."""
     stats = {"created": 0, "updated": 0, "skipped": 0, "invalid": 0}
     existing_by_ean = {
         food.ean: food
@@ -276,7 +276,7 @@ CZECH_COUNTRY_TAGS = {"en:czech-republic", "en:czechia"}
 
 
 def is_czech_product(raw: dict) -> bool:
-    """Vrátí True, pokud se produkt prodává v ČR nebo má český název/EAN."""
+    """Returns True if the product is sold in CZ or has a Czech name/EAN."""
     countries = raw.get("countries_tags") or []
     if any(tag in CZECH_COUNTRY_TAGS for tag in countries):
         return True
@@ -289,7 +289,7 @@ def is_czech_product(raw: dict) -> bool:
 
 
 def download_off_dump(dest_path: str, url: str = DEFAULT_OFF_DUMP_URL, on_download_progress=None) -> str:
-    """Stáhne aktuální hromadný .jsonl.gz export z Open Food Facts na disk."""
+    """Downloads the current bulk .jsonl.gz export from Open Food Facts to disk."""
     headers = {
         "User-Agent": "KalorickaKalkulacka-StudentProject/1.0 (contact@example.com)",
     }
@@ -318,8 +318,8 @@ def run_dump_food_etl(
     on_download_progress=None,
 ) -> dict[str, int]:
     """
-    Načte lokální nebo automaticky stažený .jsonl.gz export z OpenFoodFacts
-    a uloží validní české potraviny do databáze.
+    Loads a local or automatically downloaded .jsonl.gz export from OpenFoodFacts
+    and saves valid Czech foods to the database.
     """
     temp_file_created = False
     if not file_path:
@@ -340,7 +340,7 @@ def run_dump_food_etl(
     try:
         with gzip.open(file_path, "rt", encoding="utf-8") as f:
             for line in f:
-                # Rychlé textové předfiltrování (přeskočí ~99 % ne-českých řádků bez parsování JSONu)
+                # Fast text pre-filtering (skips ~99% of non-Czech lines without JSON parsing)
                 if '"en:czech' not in line and '"product_name_cs"' not in line and '859' not in line:
                     continue
 
@@ -377,7 +377,7 @@ def run_dump_food_etl(
 
 
 def verify_food_database_quality() -> dict[str, int]:
-    """Zkontroluje integritu dat v databázi (duplicity EAN, chybějící povinná pole)."""
+    """Checks data integrity in the database (duplicate EANs, missing required fields)."""
     active = Food.objects.filter(is_active=True)
     duplicate_eans = (
         active.exclude(ean="")

@@ -8,15 +8,15 @@ class FoodSyncService {
 
   FoodSyncService(this.db);
 
-  /// Vrátí aktuální verzi databáze z tabulky Dbversion (0, pokud ještě není nastavena).
+  /// Returns the current database version from the Dbversion table (0 if not set yet).
   Future<int> getCurrentVersion() async {
     final rows = await db.query('Dbversion', limit: 1);
     if (rows.isEmpty) return 0;
     return rows.first['version'] as int;
   }
 
-  /// Rozbalí .db.gz snapshot do dočasného souboru, zkopíruje potraviny do food.db
-  /// a uloží verzi databáze (výchozí 1) do tabulky Dbversion.
+  /// Unpacks a .db.gz snapshot into a temporary file, copies foods into food.db,
+  /// and saves the database version (default 1) into the Dbversion table.
   Future<void> importFromSnapshot(
     String snapshotGzPath, {
     int snapshotVersion = 1,
@@ -26,7 +26,7 @@ class FoodSyncService {
       throw FileSystemException('Snapshot soubor neexistuje', snapshotGzPath);
     }
 
-    // 1. Rozbalení gzip do dočasného .db souboru
+    // 1. Unpack gzip into a temporary .db file
     final compressedBytes = await gzFile.readAsBytes();
     final decompressedBytes = gzip.decode(compressedBytes);
 
@@ -37,10 +37,10 @@ class FoodSyncService {
 
     Database? snapshotDb;
     try {
-      // 2. Otevření rozbaleného snapshotu pouze pro čtení
+      // 2. Open the unpacked snapshot as read-only
       snapshotDb = await openDatabase(tempDbPath, readOnly: true);
 
-      // Zjištění názvu tabulky ve snapshotu (ošetří 'Food', 'food' i 'foods')
+      // Detect table name in snapshot (handles 'Food', 'food', and 'foods')
       final tables = await snapshotDb.rawQuery(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND LOWER(name) LIKE 'food%'",
       );
@@ -50,9 +50,9 @@ class FoodSyncService {
       final sourceTable = tables.first['name'] as String;
       final snapshotRows = await snapshotDb.query(sourceTable);
 
-      // 3. Zkopírování dat do lokální food.db v jedné transakci
+      // 3. Copy data into local food.db in a single transaction
       await db.transaction((txn) async {
-        // Vyčištění případných starých katalogových dat před importem snapshotu
+        // Clear any old catalog data before importing the snapshot
         await txn.delete('Food', where: 'is_custom = 0');
 
         for (final row in snapshotRows) {
@@ -80,7 +80,7 @@ class FoodSyncService {
           );
         }
 
-        // Nastavení verze databáze v Dbversion
+        // Set database version in Dbversion
         await txn.delete('Dbversion');
         await txn.insert('Dbversion', {'version': snapshotVersion});
       });
@@ -92,8 +92,8 @@ class FoodSyncService {
     }
   }
 
-  /// Aplikuje změny z delta JSON souboru v jedné transakci.
-  /// Při chybě se provede rollback a v databázi se nezmění vůbec nic.
+  /// Applies changes from a delta JSON file in a single transaction.
+  /// On error, rolls back and nothing changes in the database.
   Future<void> applyDelta(String deltaJsonPath) async {
     final jsonFile = File(deltaJsonPath);
     if (!await jsonFile.exists()) {
@@ -111,7 +111,7 @@ class FoodSyncService {
     final List<dynamic> changes = decoded['changes'] as List<dynamic>;
 
     await db.transaction((txn) async {
-      // Ověření návaznosti verze
+      // Verify version continuity
       final versionRows = await txn.query('Dbversion', limit: 1);
       final currentVersion =
           versionRows.isEmpty ? 0 : versionRows.first['version'] as int;
@@ -132,7 +132,7 @@ class FoodSyncService {
 
         switch (action) {
           case 'DELETED':
-            // Soft delete – potravina se nesmaže, pouze se označí jako neaktivní
+            // Soft delete – the food is not deleted, only marked as inactive
             final updatedCount = await txn.update(
               'Food',
               {'is_active': 0},
@@ -151,9 +151,9 @@ class FoodSyncService {
                 'Chybějící nebo prázdná data pro UPDATED u id=$foodId.',
               );
             }
-            // Změní se pouze pole uvedená v objektu data
+            // Only fields listed in the data object are changed
             final updateFields = Map<String, dynamic>.from(rawData);
-            updateFields.remove('id'); // Primární klíč neměníme
+            updateFields.remove('id'); // Do not change primary key
 
             final updatedCount = await txn.update(
               'Food',
@@ -203,7 +203,7 @@ class FoodSyncService {
         }
       }
 
-      // Po úspěšném provedení všech změn uložíme nové číslo verze
+      // After successfully applying all changes, save the new version number
       await txn.delete('Dbversion');
       await txn.insert('Dbversion', {'version': toVersion});
     });

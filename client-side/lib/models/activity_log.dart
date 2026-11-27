@@ -2,11 +2,11 @@ import 'activity.dart';
 
 class ActivityLog {
   final int? id;
-  final int? activityId;     // ID z katalogu ('Ze seznamu'), null pro 'Vlastní aktivita'
+  final int? activityId;     // ID from catalog ('From list'), null for 'Custom activity'
   final String activityName;
   final int durationMinutes;
   final double? distanceKm;
-  final double burnedKcal;   // Odhadnuté nebo ručně zapsané kalorie
+  final double burnedKcal;   // Estimated or manually entered calories
   final String date;
 
   ActivityLog({

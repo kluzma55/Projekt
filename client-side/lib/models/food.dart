@@ -2,7 +2,7 @@ class Food {
   final int? id;
   final String ean;
   final String name;
-  final String unit; //'g' nebo 'ml'
+  final String unit; //'g' or 'ml'
   final String imagePath;
   final double kcalPer100;
   final double proteinG;
@@ -12,7 +12,7 @@ class Food {
   final double saturatedFatG;
   final double fibersG;
   final double saltG;
-  final bool isUsed; //true, pokud byla již použita
+  final bool isUsed; //true, if it has already been used
   
   Food({
     this.id,

@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-// Uprav si název balíčku podle pubspec.yaml (např. package:calculate/services/food_sync_service.dart)
+// Adjust the package name according to pubspec.yaml (e.g. package:calculate/services/food_sync_service.dart)
 import 'package:calculate/service/food_sync_service.dart';
 
 void main() {
@@ -84,19 +84,19 @@ void main() {
     final foods = await db.query('Food', orderBy: 'id ASC');
     expect(foods.length, 4);
 
-    // ID 1: Kuřecí prsa -> aktualizováno 115 kcal a 25 g bílkovin
+    // ID 1: Chicken breast -> updated 115 kcal and 25 g protein
     final chicken = foods.firstWhere((f) => f['id'] == 1);
     expect(chicken['name'], 'Kuřecí prsa');
     expect(chicken['kcal_per_100'], 115.0);
     expect(chicken['protein_g'], 25.0);
     expect(chicken['is_active'], 1);
 
-    // ID 3: Plnotučné mléko -> DELETED (pouze neaktivní, nesmazané)
+    // ID 3: Whole milk -> DELETED (inactive only, not deleted)
     final milk = foods.firstWhere((f) => f['id'] == 3);
     expect(milk['name'], 'Plnotučné mléko');
     expect(milk['is_active'], 0);
 
-    // ID 4: Banán -> CREATED
+    // ID 4: Banana -> CREATED
     final banana = foods.firstWhere((f) => f['id'] == 4);
     expect(banana['name'], 'Banán');
     expect(banana['kcal_per_100'], 89.0);
@@ -126,7 +126,7 @@ void main() {
         throwsFormatException,
       );
 
-      // Verze musí zůstat 1 a Plnotučné mléko musí být stále aktivní (is_active == 1)
+      // Version must remain 1 and Whole milk must still be active (is_active == 1)
       expect(await syncService.getCurrentVersion(), 1);
       final milk = (await db.query('Food', where: 'id = 3')).first;
       expect(milk['is_active'], 1);
