@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../widgets/bottom_navigation.dart';
 
-import '../models/activity_log.dart';
+import '../models/tables/activity_log.dart';
 
 class CustomActivityScreen extends StatefulWidget {
   final DateTime? selectedDate;

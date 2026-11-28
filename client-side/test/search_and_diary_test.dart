@@ -4,10 +4,10 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:calculate/database/food_database.dart';
 import 'package:calculate/database/user_database.dart';
-import 'package:calculate/models/food.dart';
-import 'package:calculate/models/custom_food.dart';
-import 'package:calculate/models/food_search_result.dart';
-import 'package:calculate/models/diary_entry.dart';
+import 'package:calculate/models/tables/food.dart';
+import 'package:calculate/models/tables/custom_food.dart';
+import 'package:calculate/models/in_memory/food_search_result.dart';
+import 'package:calculate/models/tables/diary_entry.dart';
 import 'package:calculate/services/search_service.dart';
 import 'package:calculate/services/food_search_service.dart';
 import 'package:calculate/services/diary_entry_service.dart';
@@ -422,7 +422,6 @@ void main() {
       final result = service.validate(
         selectedFood: testFood,
         amountText: '150',
-        unit: Unit.g,
         mealType: DiaryEntry.breakfast,
         date: '2026-11-27',
       );
@@ -434,7 +433,6 @@ void main() {
       final result = service.validate(
         selectedFood: null,
         amountText: '150',
-        unit: Unit.g,
         mealType: DiaryEntry.breakfast,
         date: '2026-11-27',
       );
@@ -445,7 +443,6 @@ void main() {
       final result = service.validate(
         selectedFood: testFood,
         amountText: '0',
-        unit: Unit.g,
         mealType: DiaryEntry.breakfast,
         date: '2026-11-27',
       );
@@ -456,18 +453,34 @@ void main() {
       final result = service.validate(
         selectedFood: testFood,
         amountText: '-50',
-        unit: Unit.g,
         mealType: DiaryEntry.breakfast,
         date: '2026-11-27',
       );
       expect(result.errors, contains(DiaryEntryError.invalidAmount));
     });
 
+    test('vrátí chybu při množství menším než 0.1', () {
+      final result = service.validate(
+        selectedFood: testFood,
+        amountText: '0.05',
+        mealType: DiaryEntry.breakfast,
+        date: '2026-11-27',
+      );
+      expect(result.errors, contains(DiaryEntryError.invalidAmount));
+
+      final minResult = service.validate(
+        selectedFood: testFood,
+        amountText: '0.1',
+        mealType: DiaryEntry.breakfast,
+        date: '2026-11-27',
+      );
+      expect(minResult.isValid, isTrue);
+    });
+
     test('vrátí chybu při neplatném formátu množství', () {
       final result = service.validate(
         selectedFood: testFood,
         amountText: 'abc',
-        unit: Unit.g,
         mealType: DiaryEntry.breakfast,
         date: '2026-11-27',
       );
@@ -478,7 +491,6 @@ void main() {
       final result = service.validate(
         selectedFood: testFood,
         amountText: '150,5',
-        unit: Unit.g,
         mealType: DiaryEntry.breakfast,
         date: '2026-11-27',
       );
@@ -490,7 +502,6 @@ void main() {
       final result = service.validate(
         selectedFood: testFood,
         amountText: '100',
-        unit: Unit.g,
         mealType: DiaryEntry.breakfast,
         date: '27-11-2026', // invalid format
       );
@@ -501,7 +512,6 @@ void main() {
       final result = service.validate(
         selectedFood: testFood,
         amountText: '100',
-        unit: Unit.g,
         mealType: 'Neplatný typ',
         date: '2026-11-27',
       );
@@ -512,7 +522,6 @@ void main() {
       final result = service.validate(
         selectedFood: testFood,
         amountText: '200',
-        unit: Unit.g,
         mealType: DiaryEntry.lunch,
         date: '2026-11-27',
       );

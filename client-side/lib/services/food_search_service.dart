@@ -1,6 +1,6 @@
 import '../database/food_database.dart';
 import '../database/user_database.dart';
-import '../models/food_search_result.dart';
+import '../models/in_memory/food_search_result.dart';
 import 'search_service.dart';
 
 /// Specialized search service for foods.
@@ -17,11 +17,11 @@ import 'search_service.dart';
 /// ```dart
 /// final service = FoodSearchService();
 ///
-/// // Search "jablk" in both databases at once:
-/// final results = await service.searchByName('jablk');
+/// // Search "jablk" in both databases at once (always pass `limit` in UI!):
+/// final results = await service.searchByName('jablk', limit: 50);
 ///
 /// // Search only in custom foods:
-/// final custom = await service.searchCustomFoods('tyčinka');
+/// final custom = await service.searchCustomFoods('tyčinka', limit: 50);
 ///
 /// // Search by EAN (prepared for future scanner):
 /// final byEan = await service.searchByEan('8590000000012');
@@ -40,6 +40,11 @@ class FoodSearchService {
   ///
   /// Custom foods are sorted first (searched first).
   /// If [query] is empty, returns all records (respecting [limit]).
+  ///
+  /// IMPORTANT FOR DEVELOPERS / AGENTS:
+  /// Always pass a [limit] (e.g., `limit: 50`) when calling this from a UI
+  /// screen so broad queries (like `"a"`) don't load the entire food catalog
+  /// into memory.
   Future<List<FoodSearchResult>> searchByName(
     String query, {
     int? limit,
@@ -79,6 +84,27 @@ class FoodSearchService {
   // Factories for SearchSource
   // ---------------------------------------------------------------------------
 
+  static FoodSearchResult _rowToResult(
+    Map<String, dynamic> row,
+    FoodSource source,
+  ) {
+    return FoodSearchResult(
+      id: row['id'] as int,
+      name: row['name'] as String,
+      source: source,
+      kcalPer100: (row['kcal_per_100'] as num).toDouble(),
+      proteinPer100: (row['protein_g'] as num).toDouble(),
+      carbsPer100: (row['carbs_g'] as num).toDouble(),
+      fatPer100: (row['fat_g'] as num).toDouble(),
+      sugarsPer100: (row['sugars_g'] as num?)?.toDouble(),
+      saturatedFatPer100: (row['saturated_fat_g'] as num?)?.toDouble(),
+      fibersPer100: (row['fibers_g'] as num?)?.toDouble(),
+      saltPer100: (row['salt_g'] as num?)?.toDouble(),
+      unit: (row['unit'] as String?) ?? 'g',
+      ean: (row['ean'] as String?) ?? '',
+    );
+  }
+
   Future<SearchSource<FoodSearchResult>> _buildCatalogSource({
     int? limit,
   }) async {
@@ -89,17 +115,7 @@ class FoodSearchService {
       searchColumns: const ['name'],
       orderBy: 'is_used DESC, name ASC',
       limit: limit,
-      fromRow: (row) => FoodSearchResult(
-        id: row['id'] as int,
-        name: row['name'] as String,
-        source: FoodSource.catalog,
-        kcalPer100: (row['kcal_per_100'] as num).toDouble(),
-        proteinPer100: (row['protein_g'] as num).toDouble(),
-        carbsPer100: (row['carbs_g'] as num).toDouble(),
-        fatPer100: (row['fat_g'] as num).toDouble(),
-        unit: (row['unit'] as String?) ?? 'g',
-        ean: (row['ean'] as String?) ?? '',
-      ),
+      fromRow: (row) => _rowToResult(row, FoodSource.catalog),
     );
   }
 
@@ -113,17 +129,7 @@ class FoodSearchService {
       searchColumns: const ['name'],
       orderBy: 'name ASC',
       limit: limit,
-      fromRow: (row) => FoodSearchResult(
-        id: row['id'] as int,
-        name: row['name'] as String,
-        source: FoodSource.custom,
-        kcalPer100: (row['kcal_per_100'] as num).toDouble(),
-        proteinPer100: (row['protein_g'] as num).toDouble(),
-        carbsPer100: (row['carbs_g'] as num).toDouble(),
-        fatPer100: (row['fat_g'] as num).toDouble(),
-        unit: (row['unit'] as String?) ?? 'g',
-        ean: (row['ean'] as String?) ?? '',
-      ),
+      fromRow: (row) => _rowToResult(row, FoodSource.custom),
     );
   }
 
@@ -147,17 +153,7 @@ class FoodSearchService {
         searchColumns: const ['ean'],
         orderBy: 'name ASC',
         limit: 1,
-        fromRow: (row) => FoodSearchResult(
-          id: row['id'] as int,
-          name: row['name'] as String,
-          source: FoodSource.custom,
-          kcalPer100: (row['kcal_per_100'] as num).toDouble(),
-          proteinPer100: (row['protein_g'] as num).toDouble(),
-          carbsPer100: (row['carbs_g'] as num).toDouble(),
-          fatPer100: (row['fat_g'] as num).toDouble(),
-          unit: (row['unit'] as String?) ?? 'g',
-          ean: (row['ean'] as String?) ?? '',
-        ),
+        fromRow: (row) => _rowToResult(row, FoodSource.custom),
       ),
       SearchSource<FoodSearchResult>(
         database: foodDb,
@@ -165,17 +161,7 @@ class FoodSearchService {
         searchColumns: const ['ean'],
         orderBy: 'name ASC',
         limit: 1,
-        fromRow: (row) => FoodSearchResult(
-          id: row['id'] as int,
-          name: row['name'] as String,
-          source: FoodSource.catalog,
-          kcalPer100: (row['kcal_per_100'] as num).toDouble(),
-          proteinPer100: (row['protein_g'] as num).toDouble(),
-          carbsPer100: (row['carbs_g'] as num).toDouble(),
-          fatPer100: (row['fat_g'] as num).toDouble(),
-          unit: (row['unit'] as String?) ?? 'g',
-          ean: (row['ean'] as String?) ?? '',
-        ),
+        fromRow: (row) => _rowToResult(row, FoodSource.catalog),
       ),
     ];
   }

@@ -1,14 +1,14 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import '../models/custom_food.dart';
-import '../models/custom_meal.dart';
-import '../models/diary_entry.dart';
-import '../models/user_profile.dart';
-import '../models/activity.dart';
-import '../models/activity_log.dart';
+import '../models/tables/custom_food.dart';
+import '../models/tables/custom_meal.dart';
+import '../models/tables/diary_entry.dart';
+import '../models/tables/user_profile.dart';
+import '../models/tables/activity.dart';
+import '../models/tables/activity_log.dart';
 import 'food_database.dart';
-import '../models/body_measurement.dart';
-import '../models/water_log.dart';
+import '../models/tables/body_measurement.dart';
+import '../models/tables/water_log.dart';
 
 class UserDatabase {
   static final UserDatabase instance = UserDatabase._init();
@@ -28,12 +28,56 @@ class UserDatabase {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
       onCreate: _createDB,
+      onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      final cols = await db.rawQuery('PRAGMA table_info(DiaryEntry)');
+      final hasUnit = cols.any((c) => c['name'] == 'unit');
+      if (hasUnit) {
+        await db.transaction((txn) async {
+          await txn.execute('''
+            CREATE TABLE DiaryEntry_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              food_id INTEGER NOT NULL,
+              custom_food_id INTEGER,
+              meal_id INTEGER,
+              food_name TEXT NOT NULL,
+              amount REAL NOT NULL,
+              kcal REAL NOT NULL,
+              protein_g REAL NOT NULL,
+              carbs_g REAL NOT NULL,
+              fat_g REAL NOT NULL,
+              is_fluid_intake INTEGER NOT NULL DEFAULT 0,
+              meal_type TEXT NOT NULL,
+              date TEXT NOT NULL
+            )
+          ''');
+          await txn.execute('''
+            INSERT INTO DiaryEntry_new (
+              id, food_id, custom_food_id, meal_id, food_name, amount,
+              kcal, protein_g, carbs_g, fat_g, is_fluid_intake, meal_type, date
+            )
+            SELECT
+              id, food_id, custom_food_id, meal_id, food_name, amount,
+              kcal, protein_g, carbs_g, fat_g, is_fluid_intake, meal_type, date
+            FROM DiaryEntry
+          ''');
+          await txn.execute('DROP TABLE DiaryEntry');
+          await txn.execute('ALTER TABLE DiaryEntry_new RENAME TO DiaryEntry');
+          await txn.execute(
+            'CREATE INDEX IF NOT EXISTS idx_diary_date ON DiaryEntry (date)',
+          );
+        });
+      }
+    }
   }
 // insertion of basic activities into the Activity table (can be modified further)
   Future<void> _seedDefaultActivities(Database db) async {
@@ -122,7 +166,6 @@ await db.execute('''
         meal_id INTEGER,
         food_name TEXT NOT NULL,
         amount REAL NOT NULL,
-        unit TEXT NOT NULL DEFAULT 'g',
         kcal REAL NOT NULL,
         protein_g REAL NOT NULL,
         carbs_g REAL NOT NULL,
@@ -368,9 +411,12 @@ Future<int> insertCustomFood(CustomFood food) async {
   Future<int> insertDiaryEntry(DiaryEntry entry) async {
     final db = await database;
     final id = await db.insert('DiaryEntry', entry.toMap());
-    // Marks the food in food.db as used (only for foods from the catalog)
+    // Marks the food in food.db as used (only for foods from the catalog).
+    // Best-effort: failure on food.db must not fail an already-saved diary entry.
     if (entry.customFoodId == null && entry.foodId > 0) {
-      await FoodDatabase.instance.markFoodAsUsed(entry.foodId, isUsed: true);
+      try {
+        await FoodDatabase.instance.markFoodAsUsed(entry.foodId, isUsed: true);
+      } catch (_) {}
     }
     return id;
   }

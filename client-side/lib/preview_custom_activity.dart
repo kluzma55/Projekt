@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'screens/custom_activity_screen.dart';
 import 'database/user_database.dart';
-import 'models/activity_log.dart';
+import 'models/tables/activity_log.dart';
 
 void main() {
   runApp(

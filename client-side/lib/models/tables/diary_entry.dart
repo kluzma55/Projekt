@@ -1,21 +1,3 @@
-/// Amount unit of a diary entry.
-enum Unit {
-  g,
-  ml;
-
-  /// Creates [Unit] from a string; returns [Unit.g] for an unknown value.
-  static Unit fromString(String? value) {
-    if (value == null) return Unit.g;
-    return Unit.values.firstWhere(
-      (u) => u.name == value.trim().toLowerCase(),
-      orElse: () => Unit.g,
-    );
-  }
-
-  /// Text representation for saving to DB and displaying in UI ('g' or 'ml').
-  String get displayName => name;
-}
-
 class DiaryEntry {
   static const String breakfast = 'Snídaně';
   static const String morningSnack = 'Dopolední svačina';
@@ -46,18 +28,15 @@ class DiaryEntry {
 
   final String foodName;
 
-  /// Amount entered by the user (in [unit]).
+  /// Amount entered by the user (in the food's predefined unit: g or ml).
   final double amount;
-
-  /// Amount unit – g or ml.
-  final Unit unit;
 
   final double kcal;
   final double proteinG;
   final double carbsG;
   final double fatG;
 
-  /// If [unit] == [Unit.ml] and this field is true, the amount is
+  /// If the food's unit is 'ml' and this field is true, [amount] is
   /// counted toward daily fluid intake (Hydration).
   final bool isFluidIntake;
 
@@ -71,7 +50,6 @@ class DiaryEntry {
     this.mealId,
     required this.foodName,
     required this.amount,
-    Unit? unit,
     required this.kcal,
     required this.proteinG,
     required this.carbsG,
@@ -79,8 +57,7 @@ class DiaryEntry {
     this.isFluidIntake = false,
     String? mealType,
     required this.date,
-  })  : unit = unit ?? Unit.g,
-        mealType = (mealType != null && mealType.trim().isNotEmpty)
+  }) : mealType = (mealType != null && mealType.trim().isNotEmpty)
             ? mealType
             : other;
 
@@ -92,7 +69,6 @@ class DiaryEntry {
       'meal_id': mealId,
       'food_name': foodName,
       'amount': amount,
-      'unit': unit.name,
       'kcal': kcal,
       'protein_g': proteinG,
       'carbs_g': carbsG,
@@ -113,7 +89,6 @@ class DiaryEntry {
       mealId: map['meal_id'] as int?,
       foodName: map['food_name'] as String,
       amount: (map['amount'] as num).toDouble(),
-      unit: Unit.fromString(map['unit'] as String?),
       kcal: (map['kcal'] as num).toDouble(),
       proteinG: (map['protein_g'] as num).toDouble(),
       carbsG: (map['carbs_g'] as num).toDouble(),
@@ -133,7 +108,6 @@ class DiaryEntry {
     int? mealId,
     String? foodName,
     double? amount,
-    Unit? unit,
     double? kcal,
     double? proteinG,
     double? carbsG,
@@ -149,7 +123,6 @@ class DiaryEntry {
       mealId: mealId ?? this.mealId,
       foodName: foodName ?? this.foodName,
       amount: amount ?? this.amount,
-      unit: unit ?? this.unit,
       kcal: kcal ?? this.kcal,
       proteinG: proteinG ?? this.proteinG,
       carbsG: carbsG ?? this.carbsG,

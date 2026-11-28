@@ -33,6 +33,11 @@ class SearchSource<T> {
   final String orderBy;
 
   /// Maximum number of returned results. Null = unlimited.
+  ///
+  /// IMPORTANT FOR DEVELOPERS / AGENTS:
+  /// Always set a reasonable [limit] (e.g., 50–100) when using [SearchService]
+  /// in UI or against large tables. Leaving it `null` on a broad single-letter
+  /// query can load tens of thousands of rows into memory at once.
   final int? limit;
 
   /// Function that transforms a single database row into an object of type [T].
@@ -58,14 +63,14 @@ class SearchSource<T> {
 /// // 1. Create an instance once (or pass it via DI):
 /// final searchService = SearchService();
 ///
-/// // 2. Define sources:
+/// // 2. Define sources (always set a reasonable `limit` for UI/large tables):
 /// final sources = [
 ///   SearchSource<FoodSearchResult>(
 ///     database: await FoodDatabase.instance.database,
 ///     tableName: 'Food',
 ///     searchColumns: ['name'],
-///     additionalWhere: 'is_used = 1 OR is_used = 0', // all active
 ///     orderBy: 'is_used DESC, name ASC',
+///     limit: 50,
 ///     fromRow: (row) => FoodSearchResult(
 ///       id: row['id'] as int,
 ///       name: row['name'] as String,

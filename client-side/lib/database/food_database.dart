@@ -1,7 +1,7 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import '../models/db_version.dart';
-import '../models/food.dart';
+import '../models/tables/db_version.dart';
+import '../models/tables/food.dart';
 
 class FoodDatabase {
   static final FoodDatabase instance = FoodDatabase._init();

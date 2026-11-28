@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:calculate/database/user_database.dart';
-import 'package:calculate/models/activity_log.dart';
+import 'package:calculate/models/tables/activity_log.dart';
 
 void main() {
   sqfliteFfiInit();

@@ -4,16 +4,16 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:calculate/database/food_database.dart';
 import 'package:calculate/database/user_database.dart';
-import 'package:calculate/models/db_version.dart';
-import 'package:calculate/models/diary_entry.dart';
-import 'package:calculate/models/food.dart';
-import 'package:calculate/models/user_profile.dart';
-import 'package:calculate/models/activity.dart';
-import 'package:calculate/models/activity_log.dart';
-import 'package:calculate/models/custom_meal.dart';
-import 'package:calculate/models/custom_food.dart';
-import 'package:calculate/models/body_measurement.dart';
-import 'package:calculate/models/water_log.dart';
+import 'package:calculate/models/tables/db_version.dart';
+import 'package:calculate/models/tables/diary_entry.dart';
+import 'package:calculate/models/tables/food.dart';
+import 'package:calculate/models/tables/user_profile.dart';
+import 'package:calculate/models/tables/activity.dart';
+import 'package:calculate/models/tables/activity_log.dart';
+import 'package:calculate/models/tables/custom_meal.dart';
+import 'package:calculate/models/tables/custom_food.dart';
+import 'package:calculate/models/tables/body_measurement.dart';
+import 'package:calculate/models/tables/water_log.dart';
 
 void main() {
   sqfliteFfiInit();

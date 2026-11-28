@@ -1,13 +1,13 @@
 import '../database/user_database.dart';
-import '../models/diary_entry.dart';
-import '../models/food_search_result.dart';
+import '../models/tables/diary_entry.dart';
+import '../models/in_memory/food_search_result.dart';
 
 /// Error states when validating a diary entry.
 enum DiaryEntryError {
   /// No food was selected.
   noFoodSelected,
 
-  /// Amount is zero or negative.
+  /// Amount is below the minimum allowed value (0.1).
   invalidAmount,
 
   /// Amount is not a valid number (contains invalid characters).
@@ -37,28 +37,9 @@ class DiaryEntryValidationResult {
 /// 1. Input validation
 /// 2. Recalculation of nutritional values by amount
 /// 3. Saving the entry to user.db (DiaryEntry table)
-///
-/// ## Usage example
-///
-/// ```dart
-/// final service = DiaryEntryService();
-///
-/// final result = await service.saveEntry(
-///   selectedFood: searchResult,  // result from FoodSearchService
-///   amountText: '150',           // text from TextField
-///   unit: Unit.g,
-///   mealType: DiaryEntry.breakfast,
-///   date: '2026-11-27',
-///   isFluidIntake: false,
-/// );
-///
-/// if (result.isValid) {
-///   // Entry was saved
-/// } else {
-///   // Show errors: result.errors
-/// }
-/// ```
 class DiaryEntryService {
+  static const double minAmount = 0.1;
+
   final UserDatabase _userDb;
 
   DiaryEntryService({UserDatabase? userDatabase})
@@ -69,13 +50,9 @@ class DiaryEntryService {
   // ---------------------------------------------------------------------------
 
   /// Validates inputs and builds [DiaryEntry] without saving to DB.
-  ///
-  /// Use when you want to validate the form before showing a preview or
-  /// before saving itself.
   DiaryEntryValidationResult validate({
     required FoodSearchResult? selectedFood,
     required String amountText,
-    Unit unit = Unit.g,
     required String mealType,
     required String date,
     bool isFluidIntake = false,
@@ -91,7 +68,7 @@ class DiaryEntryService {
     final parsedAmount = _parseAmount(amountText);
     if (parsedAmount == null) {
       errors.add(DiaryEntryError.invalidAmountFormat);
-    } else if (parsedAmount <= 0) {
+    } else if (parsedAmount < minAmount) {
       errors.add(DiaryEntryError.invalidAmount);
     }
 
@@ -109,13 +86,13 @@ class DiaryEntryService {
       return DiaryEntryValidationResult(errors: errors);
     }
 
+    final isLiquid = selectedFood.unit.trim().toLowerCase() == 'ml';
     final entry = _buildEntry(
       food: selectedFood,
       amount: parsedAmount,
-      unit: unit,
       mealType: mealType,
       date: date,
-      isFluidIntake: isFluidIntake,
+      isFluidIntake: isLiquid && isFluidIntake,
     );
 
     return DiaryEntryValidationResult(entry: entry, errors: const []);
@@ -126,16 +103,9 @@ class DiaryEntryService {
   // ---------------------------------------------------------------------------
 
   /// Validates inputs, recalculates nutritional values, and saves the entry to DB.
-  ///
-  /// Returns [DiaryEntryValidationResult]:
-  /// - If validation fails, [DiaryEntryValidationResult.isValid] is false
-  ///   and [DiaryEntryValidationResult.errors] contains the errors.
-  /// - If everything succeeds, [DiaryEntryValidationResult.entry]
-  ///   contains the saved [DiaryEntry] (with assigned ID from DB).
   Future<DiaryEntryValidationResult> saveEntry({
     required FoodSearchResult? selectedFood,
     required String amountText,
-    Unit unit = Unit.g,
     required String mealType,
     required String date,
     bool isFluidIntake = false,
@@ -143,7 +113,6 @@ class DiaryEntryService {
     final validation = validate(
       selectedFood: selectedFood,
       amountText: amountText,
-      unit: unit,
       mealType: mealType,
       date: date,
       isFluidIntake: isFluidIntake,
@@ -181,7 +150,6 @@ class DiaryEntryService {
   DiaryEntry _buildEntry({
     required FoodSearchResult food,
     required double amount,
-    required Unit unit,
     required String mealType,
     required String date,
     required bool isFluidIntake,
@@ -193,7 +161,6 @@ class DiaryEntryService {
       customFoodId: food.source == FoodSource.custom ? food.id : null,
       foodName: food.name,
       amount: amount,
-      unit: unit,
       kcal: nutrition['kcal']!,
       proteinG: nutrition['protein_g']!,
       carbsG: nutrition['carbs_g']!,
