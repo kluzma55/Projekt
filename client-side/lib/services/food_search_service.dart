@@ -102,6 +102,7 @@ class FoodSearchService {
       saltPer100: (row['salt_g'] as num?)?.toDouble(),
       unit: (row['unit'] as String?) ?? 'g',
       ean: (row['ean'] as String?) ?? '',
+      isActive: (row['is_active'] as int? ?? 1) == 1,
     );
   }
 
@@ -113,6 +114,7 @@ class FoodSearchService {
       database: db,
       tableName: 'Food',
       searchColumns: const ['name'],
+      additionalWhere: 'is_active = 1',
       orderBy: 'is_used DESC, name ASC',
       limit: limit,
       fromRow: (row) => _rowToResult(row, FoodSource.catalog),
@@ -159,6 +161,7 @@ class FoodSearchService {
         database: foodDb,
         tableName: 'Food',
         searchColumns: const ['ean'],
+        additionalWhere: 'is_active = 1',
         orderBy: 'name ASC',
         limit: 1,
         fromRow: (row) => _rowToResult(row, FoodSource.catalog),

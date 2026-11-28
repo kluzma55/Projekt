@@ -246,6 +246,9 @@ class _DetailJidlaScreenState extends State<DetailJidlaScreen> {
   }
 
   String _formatErrors(List<DiaryEntryError> errors) {
+    if (errors.contains(DiaryEntryError.foodInactive)) {
+      return 'Tuto potravinu již nelze zapsat do deníku.';
+    }
     if (errors.contains(DiaryEntryError.invalidAmount)) {
       return 'Minimální množství je 0,1 ${widget.food.unit}.';
     }

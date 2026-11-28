@@ -34,7 +34,11 @@ class DiaryEntry {
   final double kcal;
   final double proteinG;
   final double carbsG;
+  final double sugarsG;
   final double fatG;
+  final double saturatedFatG;
+  final double fibersG;
+  final double saltG;
 
   /// If the food's unit is 'ml' and this field is true, [amount] is
   /// counted toward daily fluid intake (Hydration).
@@ -53,7 +57,11 @@ class DiaryEntry {
     required this.kcal,
     required this.proteinG,
     required this.carbsG,
+    this.sugarsG = 0.0,
     required this.fatG,
+    this.saturatedFatG = 0.0,
+    this.fibersG = 0.0,
+    this.saltG = 0.0,
     this.isFluidIntake = false,
     String? mealType,
     required this.date,
@@ -72,7 +80,11 @@ class DiaryEntry {
       'kcal': kcal,
       'protein_g': proteinG,
       'carbs_g': carbsG,
+      'sugars_g': sugarsG,
       'fat_g': fatG,
+      'saturated_fat_g': saturatedFatG,
+      'fibers_g': fibersG,
+      'salt_g': saltG,
       'is_fluid_intake': isFluidIntake ? 1 : 0,
       'meal_type': mealType,
       'date': date,
@@ -92,7 +104,11 @@ class DiaryEntry {
       kcal: (map['kcal'] as num).toDouble(),
       proteinG: (map['protein_g'] as num).toDouble(),
       carbsG: (map['carbs_g'] as num).toDouble(),
+      sugarsG: (map['sugars_g'] as num? ?? 0).toDouble(),
       fatG: (map['fat_g'] as num).toDouble(),
+      saturatedFatG: (map['saturated_fat_g'] as num? ?? 0).toDouble(),
+      fibersG: (map['fibers_g'] as num? ?? 0).toDouble(),
+      saltG: (map['salt_g'] as num? ?? 0).toDouble(),
       isFluidIntake: (map['is_fluid_intake'] as int? ?? 0) == 1,
       mealType: (rawMealType != null && rawMealType.isNotEmpty)
           ? rawMealType
@@ -111,7 +127,11 @@ class DiaryEntry {
     double? kcal,
     double? proteinG,
     double? carbsG,
+    double? sugarsG,
     double? fatG,
+    double? saturatedFatG,
+    double? fibersG,
+    double? saltG,
     bool? isFluidIntake,
     String? mealType,
     String? date,
@@ -126,7 +146,11 @@ class DiaryEntry {
       kcal: kcal ?? this.kcal,
       proteinG: proteinG ?? this.proteinG,
       carbsG: carbsG ?? this.carbsG,
+      sugarsG: sugarsG ?? this.sugarsG,
       fatG: fatG ?? this.fatG,
+      saturatedFatG: saturatedFatG ?? this.saturatedFatG,
+      fibersG: fibersG ?? this.fibersG,
+      saltG: saltG ?? this.saltG,
       isFluidIntake: isFluidIntake ?? this.isFluidIntake,
       mealType: mealType ?? this.mealType,
       date: date ?? this.date,

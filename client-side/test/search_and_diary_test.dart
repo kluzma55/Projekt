@@ -396,6 +396,29 @@ void main() {
       final results = await foodSearch.searchByEan('');
       expect(results, isEmpty);
     });
+
+    test('neaktivní (soft-deleted) potraviny se nezobrazí ve vyhledávání',
+        () async {
+      await FoodDatabase.instance.insertFood(Food(
+        id: 601,
+        ean: '8590000000101',
+        name: 'Neaktivní mléko',
+        kcalPer100: 50,
+        proteinG: 3,
+        carbsG: 5,
+        sugarsG: 5,
+        fatG: 1.5,
+        saturatedFatG: 1,
+        fibersG: 0,
+        saltG: 0.1,
+        isUsed: true,
+        isActive: false,
+      ));
+
+      expect(await foodSearch.searchByName('Neaktivní'), isEmpty);
+      expect(await foodSearch.searchCatalogFoods('Neaktivní'), isEmpty);
+      expect(await foodSearch.searchByEan('8590000000101'), isEmpty);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -578,7 +601,11 @@ void main() {
         kcalPer100: 165,
         proteinPer100: 31,
         carbsPer100: 0,
+        sugarsPer100: 0.5,
         fatPer100: 3.6,
+        saturatedFatPer100: 1.0,
+        fibersPer100: 0.2,
+        saltPer100: 0.07,
       );
 
       final result = await service.saveEntry(
@@ -593,6 +620,10 @@ void main() {
       expect(result.entry?.foodId, 700);
       expect(result.entry?.customFoodId, isNull);
       expect(result.entry?.kcal, closeTo(330.0, 0.001));
+      expect(result.entry?.sugarsG, closeTo(1.0, 0.001));
+      expect(result.entry?.saturatedFatG, closeTo(2.0, 0.001));
+      expect(result.entry?.fibersG, closeTo(0.4, 0.001));
+      expect(result.entry?.saltG, closeTo(0.14, 0.001));
 
       // Verify that is_used was set
       final food700 = await FoodDatabase.instance.getFoodById(700);
@@ -603,6 +634,10 @@ void main() {
           await UserDatabase.instance.getDiaryEntriesByDate('2026-11-27');
       expect(entries.length, 1);
       expect(entries.first.foodName, 'Kuřecí prsa');
+      expect(entries.first.sugarsG, closeTo(1.0, 0.001));
+      expect(entries.first.saturatedFatG, closeTo(2.0, 0.001));
+      expect(entries.first.fibersG, closeTo(0.4, 0.001));
+      expect(entries.first.saltG, closeTo(0.14, 0.001));
     });
 
     test('saveEntry uloží vlastní potravinu (custom_food_id, food_id=0)', () async {
@@ -654,6 +689,48 @@ void main() {
       final entries =
           await UserDatabase.instance.getDiaryEntriesByDate('2026-11-27');
       expect(entries, isEmpty);
+    });
+
+    test('saveEntry odmítne uložit neaktivní (soft-deleted) potravinu',
+        () async {
+      await FoodDatabase.instance.insertFood(Food(
+        id: 701,
+        name: 'Smazané jídlo',
+        kcalPer100: 100,
+        proteinG: 5,
+        carbsG: 10,
+        sugarsG: 2,
+        fatG: 3,
+        saturatedFatG: 1,
+        fibersG: 1,
+        saltG: 0.1,
+        isUsed: true,
+        isActive: false,
+      ));
+
+      const staleSearchResult = FoodSearchResult(
+        id: 701,
+        name: 'Smazané jídlo',
+        source: FoodSource.catalog,
+        kcalPer100: 100,
+        proteinPer100: 5,
+        carbsPer100: 10,
+        fatPer100: 3,
+      );
+
+      final result = await service.saveEntry(
+        selectedFood: staleSearchResult,
+        amountText: '100',
+        mealType: DiaryEntry.lunch,
+        date: '2026-11-27',
+      );
+
+      expect(result.isValid, isFalse);
+      expect(result.errors, contains(DiaryEntryError.foodInactive));
+      expect(
+        await UserDatabase.instance.getDiaryEntriesByDate('2026-11-27'),
+        isEmpty,
+      );
     });
   });
 }

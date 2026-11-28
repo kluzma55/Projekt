@@ -2,7 +2,7 @@ class Food {
   final int? id;
   final String ean;
   final String name;
-  final String unit; //'g' or 'ml'
+  final String unit; // 'g' or 'ml'
   final String imagePath;
   final double kcalPer100;
   final double proteinG;
@@ -12,8 +12,9 @@ class Food {
   final double saturatedFatG;
   final double fibersG;
   final double saltG;
-  final bool isUsed; //true, if it has already been used
-  
+  final bool isUsed; // true if it has already been used in a diary entry
+  final bool isActive; // false when soft-deleted by delta sync
+
   Food({
     this.id,
     this.ean = '',
@@ -29,6 +30,7 @@ class Food {
     required this.fibersG,
     required this.saltG,
     this.isUsed = false,
+    this.isActive = true,
   });
 
   Map<String, dynamic> toMap() {
@@ -47,6 +49,7 @@ class Food {
       'fibers_g': fibersG,
       'salt_g': saltG,
       'is_used': isUsed ? 1 : 0,
+      'is_active': isActive ? 1 : 0,
     };
   }
 
@@ -66,6 +69,7 @@ class Food {
       fibersG: (map['fibers_g'] as num).toDouble(),
       saltG: (map['salt_g'] as num).toDouble(),
       isUsed: (map['is_used'] as int? ?? 0) == 1,
+      isActive: (map['is_active'] as int? ?? 1) == 1,
     );
   }
 
@@ -84,6 +88,7 @@ class Food {
     double? fibersG,
     double? saltG,
     bool? isUsed,
+    bool? isActive,
   }) {
     return Food(
       id: id ?? this.id,
@@ -100,6 +105,7 @@ class Food {
       fibersG: fibersG ?? this.fibersG,
       saltG: saltG ?? this.saltG,
       isUsed: isUsed ?? this.isUsed,
+      isActive: isActive ?? this.isActive,
     );
   }
 }

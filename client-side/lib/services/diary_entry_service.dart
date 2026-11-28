@@ -1,3 +1,4 @@
+import '../database/food_database.dart';
 import '../database/user_database.dart';
 import '../models/tables/diary_entry.dart';
 import '../models/in_memory/food_search_result.dart';
@@ -6,6 +7,9 @@ import '../models/in_memory/food_search_result.dart';
 enum DiaryEntryError {
   /// No food was selected.
   noFoodSelected,
+
+  /// Selected catalog food is inactive (soft-deleted) and cannot be logged.
+  foodInactive,
 
   /// Amount is below the minimum allowed value (0.1).
   invalidAmount,
@@ -41,9 +45,13 @@ class DiaryEntryService {
   static const double minAmount = 0.1;
 
   final UserDatabase _userDb;
+  final FoodDatabase _foodDb;
 
-  DiaryEntryService({UserDatabase? userDatabase})
-      : _userDb = userDatabase ?? UserDatabase.instance;
+  DiaryEntryService({
+    UserDatabase? userDatabase,
+    FoodDatabase? foodDatabase,
+  })  : _userDb = userDatabase ?? UserDatabase.instance,
+        _foodDb = foodDatabase ?? FoodDatabase.instance;
 
   // ---------------------------------------------------------------------------
   // Validation
@@ -59,9 +67,11 @@ class DiaryEntryService {
   }) {
     final errors = <DiaryEntryError>[];
 
-    // 1. A food must be selected
+    // 1. A food must be selected and active
     if (selectedFood == null) {
       errors.add(DiaryEntryError.noFoodSelected);
+    } else if (!selectedFood.isActive) {
+      errors.add(DiaryEntryError.foodInactive);
     }
 
     // 2. Amount validation
@@ -122,6 +132,15 @@ class DiaryEntryService {
       return validation;
     }
 
+    if (selectedFood != null && selectedFood.source == FoodSource.catalog) {
+      final dbFood = await _foodDb.getFoodById(selectedFood.id);
+      if (dbFood != null && !dbFood.isActive) {
+        return const DiaryEntryValidationResult(
+          errors: [DiaryEntryError.foodInactive],
+        );
+      }
+    }
+
     final id = await _userDb.insertDiaryEntry(validation.entry!);
     final savedEntry = validation.entry!.copyWith(id: id);
 
@@ -164,7 +183,11 @@ class DiaryEntryService {
       kcal: nutrition['kcal']!,
       proteinG: nutrition['protein_g']!,
       carbsG: nutrition['carbs_g']!,
+      sugarsG: nutrition['sugars_g'] ?? 0.0,
       fatG: nutrition['fat_g']!,
+      saturatedFatG: nutrition['saturated_fat_g'] ?? 0.0,
+      fibersG: nutrition['fibers_g'] ?? 0.0,
+      saltG: nutrition['salt_g'] ?? 0.0,
       isFluidIntake: isFluidIntake,
       mealType: mealType,
       date: date,

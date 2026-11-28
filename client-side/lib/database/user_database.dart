@@ -28,7 +28,7 @@ class UserDatabase {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -76,6 +76,22 @@ class UserDatabase {
             'CREATE INDEX IF NOT EXISTS idx_diary_date ON DiaryEntry (date)',
           );
         });
+      }
+    }
+    if (oldVersion < 3) {
+      final cols = await db.rawQuery('PRAGMA table_info(DiaryEntry)');
+      final colNames = cols.map((c) => c['name'] as String).toSet();
+      for (final col in const [
+        'sugars_g',
+        'saturated_fat_g',
+        'fibers_g',
+        'salt_g',
+      ]) {
+        if (!colNames.contains(col)) {
+          await db.execute(
+            'ALTER TABLE DiaryEntry ADD COLUMN $col REAL NOT NULL DEFAULT 0',
+          );
+        }
       }
     }
   }
@@ -169,7 +185,11 @@ await db.execute('''
         kcal REAL NOT NULL,
         protein_g REAL NOT NULL,
         carbs_g REAL NOT NULL,
+        sugars_g REAL NOT NULL DEFAULT 0,
         fat_g REAL NOT NULL,
+        saturated_fat_g REAL NOT NULL DEFAULT 0,
+        fibers_g REAL NOT NULL DEFAULT 0,
+        salt_g REAL NOT NULL DEFAULT 0,
         is_fluid_intake INTEGER NOT NULL DEFAULT 0,
         meal_type TEXT NOT NULL,
         date TEXT NOT NULL

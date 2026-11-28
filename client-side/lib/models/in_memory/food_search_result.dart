@@ -51,6 +51,9 @@ class FoodSearchResult {
   /// EAN code (may be an empty string).
   final String ean;
 
+  /// Whether the food is active (soft-deleted catalog foods have `isActive = false`).
+  final bool isActive;
+
   const FoodSearchResult({
     required this.id,
     required this.name,
@@ -65,6 +68,7 @@ class FoodSearchResult {
     this.saltPer100,
     this.unit = 'g',
     this.ean = '',
+    this.isActive = true,
   });
 
   /// Calculates actual nutritional values for the given amount.
