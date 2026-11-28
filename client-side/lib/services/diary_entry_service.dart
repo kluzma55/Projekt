@@ -40,7 +40,7 @@ class DiaryEntryValidationResult {
 /// (amount, meal type, date) and performs:
 /// 1. Input validation
 /// 2. Recalculation of nutritional values by amount
-/// 3. Saving the entry to user.db (DiaryEntry table)
+/// 3. Saving the entry to app.db (DiaryEntry table)
 class DiaryEntryService {
   static const double minAmount = 0.1;
 

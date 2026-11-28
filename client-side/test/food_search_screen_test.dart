@@ -1,6 +1,6 @@
 import 'package:calculate/models/tables/diary_entry.dart';
 import 'package:calculate/models/in_memory/food_search_result.dart';
-import 'package:calculate/screens/homepage.dart';
+import 'package:calculate/screens/homepage_placeholder.dart';
 import 'package:calculate/services/diary_entry_service.dart';
 import 'package:calculate/services/food_search_service.dart';
 import 'package:flutter/material.dart';
@@ -100,7 +100,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Homepage(
+        home: HomepagePlaceholder(
           foodSearchService: fakeSearch,
           diaryEntryService: fakeDiary,
         ),
@@ -162,7 +162,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Homepage(
+        home: HomepagePlaceholder(
           foodSearchService: fakeSearch,
           diaryEntryService: fakeDiary,
         ),

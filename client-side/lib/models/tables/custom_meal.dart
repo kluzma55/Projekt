@@ -30,7 +30,7 @@ class CustomMealIngredient {
   final int? id;
   final int mealId;
   final int? foodId;       // Reference to food.db (if it is a food from the catalog)
-  final int? customFoodId; // Reference to user.db -> CustomFood (if it is a custom food)
+  final int? customFoodId; // Reference to app.db -> CustomFood (if it is a custom food)
   final String foodName;
   final double amountGrams;
   final double kcal;

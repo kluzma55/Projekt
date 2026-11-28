@@ -22,7 +22,7 @@ void main() {
     await UserDatabase.instance.close();
     final dbPath = await getDatabasesPath();
     final foodFile = File(p.join(dbPath, 'food.db'));
-    final userFile = File(p.join(dbPath, 'user.db'));
+    final userFile = File(p.join(dbPath, 'app.db'));
     if (await foodFile.exists()) await foodFile.delete();
     if (await userFile.exists()) await userFile.delete();
   });
@@ -217,7 +217,7 @@ void main() {
         saltG: 0.2,
       ));
 
-      // Source 2: user.db
+      // Source 2: app.db
       await UserDatabase.instance.insertCustomFood(CustomFood(
         name: 'Vlastní tyčinka',
         kcalPer100: 410,
@@ -325,7 +325,7 @@ void main() {
       expect(results.first.name, 'Sýr eidam 30%');
     });
 
-    test('searchCustomFoods prohledá pouze user.db', () async {
+    test('searchCustomFoods prohledá pouze app.db', () async {
       await FoodDatabase.instance.insertFood(Food(
         id: 500,
         name: 'Brambory',

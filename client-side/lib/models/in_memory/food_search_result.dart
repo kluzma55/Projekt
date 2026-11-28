@@ -3,7 +3,7 @@ enum FoodSource {
   /// Food from the catalog (food.db → Food table)
   catalog,
 
-  /// User's custom food (user.db → CustomFood table)
+  /// User's custom food (app.db → CustomFood table)
   custom,
 }
 

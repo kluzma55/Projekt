@@ -20,10 +20,10 @@ class DiaryEntry {
   /// ID from food.db (Food table). It is 0 if it is a CustomFood.
   final int foodId;
 
-  /// ID from user.db (CustomFood table). Null if it is a food from the catalog.
+  /// ID from app.db (CustomFood table). Null if it is a food from the catalog.
   final int? customFoodId;
 
-  /// ID from user.db (CustomMeal table). Null if it is not a custom meal.
+  /// ID from app.db (CustomMeal table). Null if it is not a custom meal.
   final int? mealId;
 
   final String foodName;

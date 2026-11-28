@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'database/food_database.dart';
 import 'models/tables/food.dart';
-import 'screens/homepage.dart';
+import 'screens/homepage_placeholder.dart';
 import 'widgets/app_colors.dart';
 
 Future<void> main() async {
@@ -107,7 +107,7 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: AppColors.background,
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.green),
       ),
-      home: const Homepage(),
+      home: const HomepagePlaceholder(),
     );
   }
 }

@@ -25,7 +25,7 @@ void main() {
     await UserDatabase.instance.close();
     final dbPath = await getDatabasesPath();
     final foodFile = File(p.join(dbPath, 'food.db'));
-    final userFile = File(p.join(dbPath, 'user.db'));
+    final userFile = File(p.join(dbPath, 'app.db'));
     if (await foodFile.exists()) await foodFile.delete();
     if (await userFile.exists()) await userFile.delete();
   });
@@ -82,7 +82,7 @@ void main() {
     expect(await foodDb.getFoodById(101), isNull);
   });
 
-  test('CRUD operace pro user.db (UserProfile a DiaryEntry)', () async {
+  test('CRUD operace pro app.db (UserProfile a DiaryEntry)', () async {
     final userDb = UserDatabase.instance;
     final foodDb = FoodDatabase.instance;
 

@@ -9,11 +9,11 @@ import 'food_search_screen.dart';
 
 /// Temporary blank homepage placeholder acting as the root screen
 /// so `< Zpět` always returns here cleanly.
-class Homepage extends StatelessWidget {
+class HomepagePlaceholder extends StatelessWidget {
   final FoodSearchService? foodSearchService;
   final DiaryEntryService? diaryEntryService;
 
-  const Homepage({
+  const HomepagePlaceholder({
     super.key,
     this.foodSearchService,
     this.diaryEntryService,

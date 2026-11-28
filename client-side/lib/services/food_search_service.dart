@@ -7,7 +7,7 @@ import 'search_service.dart';
 ///
 /// Combines results from:
 /// - [FoodDatabase] (food.db → Food table) – catalog foods
-/// - [UserDatabase] (user.db → CustomFood table) – user's custom foods
+/// - [UserDatabase] (app.db → CustomFood table) – user's custom foods
 ///
 /// Internally uses the generic [SearchService], so filtering and sorting logic
 /// can be easily extended or overridden.
@@ -62,7 +62,7 @@ class FoodSearchService {
     return _searchService.searchSingle<FoodSearchResult>(query, source);
   }
 
-  /// Searches only in custom foods (user.db → CustomFood).
+  /// Searches only in custom foods (app.db → CustomFood).
   Future<List<FoodSearchResult>> searchCustomFoods(
     String query, {
     int? limit,
