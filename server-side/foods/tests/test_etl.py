@@ -117,9 +117,9 @@ class FoodEtlPipelineTests(TestCase):
         }
         mock_response.json.side_effect = [
             page_1_payload,
-            {"products": []},  # konec 1. běhu
+            {"products": []},  # end of 1st run
             page_1_payload,
-            {"products": []},  # konec 2. běhu
+            {"products": []},  # end of 2nd run
         ]
 
         stats_first = run_food_etl()
@@ -237,7 +237,7 @@ class FoodAdminAndCommandTests(TestCase):
         with self.assertRaises(CommandError):
             call_command("import_foods")
 def _build_gz_payload(records: list[dict | str]) -> bytes:
-    """Vytvoří v paměti komprimovaný .jsonl.gz obsah ze seznamu záznamů."""
+    """Creates in-memory compressed .jsonl.gz content from a list of records."""
     buf = BytesIO()
     with gzip.GzipFile(fileobj=buf, mode="wb") as gz:
         for item in records:
@@ -361,7 +361,7 @@ class FoodDumpEtlAndQualityTests(TestCase):
         self.assertEqual(clean_report["invalid_eans"], 0)
         self.assertEqual(clean_report["missing_required_fields"], 0)
 
-        # Databáze sama zabrání vložení duplicitního EANu
+        # The database itself prevents inserting a duplicate EAN
         with self.assertRaises(IntegrityError):
             create_test_food(
                 ean="8591111111111",
@@ -370,7 +370,7 @@ class FoodDumpEtlAndQualityTests(TestCase):
                 is_active=True,
             )
 
-        # Vložení záznamu s neplatným EANem a prázdným názvem
+        # Inserting a record with an invalid EAN and empty name
         create_test_food(
             ean="123ABC",
             name="",

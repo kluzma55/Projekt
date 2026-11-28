@@ -1,8 +1,9 @@
-class CustomFood {
+class Food {
   final int? id;
   final String ean;
   final String name;
-  final String unit; // 'g' nebo 'ml'
+  final String unit; // 'g' or 'ml'
+  final String imagePath;
   final double kcalPer100;
   final double proteinG;
   final double carbsG;
@@ -11,20 +12,25 @@ class CustomFood {
   final double saturatedFatG;
   final double fibersG;
   final double saltG;
+  final bool isUsed; // true if it has already been used in a diary entry
+  final bool isActive; // false when soft-deleted by delta sync
 
-  CustomFood({
+  Food({
     this.id,
     this.ean = '',
     required this.name,
     this.unit = 'g',
+    this.imagePath = '',
     required this.kcalPer100,
     required this.proteinG,
     required this.carbsG,
-    this.sugarsG = 0.0,
+    required this.sugarsG,
     required this.fatG,
-    this.saturatedFatG = 0.0,
-    this.fibersG = 0.0,
-    this.saltG = 0.0,
+    required this.saturatedFatG,
+    required this.fibersG,
+    required this.saltG,
+    this.isUsed = false,
+    this.isActive = true,
   });
 
   Map<String, dynamic> toMap() {
@@ -33,6 +39,7 @@ class CustomFood {
       'ean': ean,
       'name': name,
       'unit': unit,
+      'image_path': imagePath,
       'kcal_per_100': kcalPer100,
       'protein_g': proteinG,
       'carbs_g': carbsG,
@@ -41,31 +48,37 @@ class CustomFood {
       'saturated_fat_g': saturatedFatG,
       'fibers_g': fibersG,
       'salt_g': saltG,
+      'is_used': isUsed ? 1 : 0,
+      'is_active': isActive ? 1 : 0,
     };
   }
 
-  factory CustomFood.fromMap(Map<String, dynamic> map) {
-    return CustomFood(
+  factory Food.fromMap(Map<String, dynamic> map) {
+    return Food(
       id: map['id'] as int?,
       ean: (map['ean'] as String?) ?? '',
       name: map['name'] as String,
       unit: (map['unit'] as String?) ?? 'g',
+      imagePath: (map['image_path'] as String?) ?? '',
       kcalPer100: (map['kcal_per_100'] as num).toDouble(),
       proteinG: (map['protein_g'] as num).toDouble(),
       carbsG: (map['carbs_g'] as num).toDouble(),
-      sugarsG: (map['sugars_g'] as num? ?? 0).toDouble(),
+      sugarsG: (map['sugars_g'] as num).toDouble(),
       fatG: (map['fat_g'] as num).toDouble(),
-      saturatedFatG: (map['saturated_fat_g'] as num? ?? 0).toDouble(),
-      fibersG: (map['fibers_g'] as num? ?? 0).toDouble(),
-      saltG: (map['salt_g'] as num? ?? 0).toDouble(),
+      saturatedFatG: (map['saturated_fat_g'] as num).toDouble(),
+      fibersG: (map['fibers_g'] as num).toDouble(),
+      saltG: (map['salt_g'] as num).toDouble(),
+      isUsed: (map['is_used'] as int? ?? 0) == 1,
+      isActive: (map['is_active'] as int? ?? 1) == 1,
     );
   }
 
-  CustomFood copyWith({
+  Food copyWith({
     int? id,
     String? ean,
     String? name,
     String? unit,
+    String? imagePath,
     double? kcalPer100,
     double? proteinG,
     double? carbsG,
@@ -74,12 +87,15 @@ class CustomFood {
     double? saturatedFatG,
     double? fibersG,
     double? saltG,
+    bool? isUsed,
+    bool? isActive,
   }) {
-    return CustomFood(
+    return Food(
       id: id ?? this.id,
       ean: ean ?? this.ean,
       name: name ?? this.name,
       unit: unit ?? this.unit,
+      imagePath: imagePath ?? this.imagePath,
       kcalPer100: kcalPer100 ?? this.kcalPer100,
       proteinG: proteinG ?? this.proteinG,
       carbsG: carbsG ?? this.carbsG,
@@ -88,6 +104,8 @@ class CustomFood {
       saturatedFatG: saturatedFatG ?? this.saturatedFatG,
       fibersG: fibersG ?? this.fibersG,
       saltG: saltG ?? this.saltG,
+      isUsed: isUsed ?? this.isUsed,
+      isActive: isActive ?? this.isActive,
     );
   }
 }

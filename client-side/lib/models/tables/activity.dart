@@ -1,8 +1,8 @@
 class Activity {
   final int? id;
   final String name;
-  final double kcalPerHourPerKg; // Základní koeficient výdeje (MET)
-  final bool hasDistance;        // True = v UI se zobrazí Vzdálenost a Průměrné tempo
+  final double kcalPerHourPerKg; // Base expenditure coefficient (MET)
+  final bool hasDistance;        // True = Distance and Average pace are shown in UI
 
   Activity({
     this.id,
@@ -11,7 +11,7 @@ class Activity {
     this.hasDistance = false,
   });
 
-  /// Formátování průměrného tempa pro UI (např. 30 min a 5 km -> "6:00 min/km")
+  /// Formatting average pace for UI (e.g. 30 min and 5 km -> "6:00 min/km")
   static String formatAveragePace(int durationMinutes, double? distanceKm) {
     if (distanceKm == null || distanceKm <= 0 || durationMinutes <= 0) {
       return '--:-- min/km';
@@ -22,7 +22,7 @@ class Activity {
     return '$mins:${secs.toString().padLeft(2, '0')} min/km';
   }
 
-  /// Odhad vydané energie podle délky, vzdálenosti (tempa) a údajů z UserProfile
+  /// Estimate of expended energy based on duration, distance (pace), and UserProfile data
   double calculateBurnedKcal({
     required int durationMinutes,
     double? distanceKm,
@@ -34,7 +34,7 @@ class Activity {
     final hours = durationMinutes / 60.0;
     if (hours <= 0) return 0.0;
 
-    // 1. Úprava koeficientu podle tempa, pokud je zadaná vzdálenost
+    // 1. Coefficient adjustment by pace, if distance is provided
     double effectiveCoeff = kcalPerHourPerKg;
     if (hasDistance && distanceKm != null && distanceKm > 0) {
       final speedKmh = distanceKm / hours;
@@ -48,7 +48,7 @@ class Activity {
       }
     }
 
-    // 2. Bazální výdej podle hmotnosti, výšky, věku a pohlaví (Mifflin-St Jeor)
+    // 2. Basal expenditure by weight, height, age, and gender (Mifflin-St Jeor)
     final isFemale = gender.toUpperCase() == 'F' || gender.toLowerCase() == 'žena';
     final bmrPerDay = (10 * weightKg) +
         (6.25 * heightCm) -
@@ -56,7 +56,7 @@ class Activity {
         (isFemale ? -161 : 5);
     final bmrPerHour = bmrPerDay / 24.0;
 
-    // 3. Celkový odhad vydané energie zaokrouhlený na celé kcal
+    // 3. Total estimate of expended energy rounded to whole kcal
     final kcal = bmrPerHour * effectiveCoeff * hours;
     return kcal.roundToDouble();
   }

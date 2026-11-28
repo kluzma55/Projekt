@@ -4,25 +4,28 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:calculate/database/food_database.dart';
 import 'package:calculate/database/user_database.dart';
-import 'package:calculate/models/db_version.dart';
-import 'package:calculate/models/diary_entry.dart';
-import 'package:calculate/models/food.dart';
-import 'package:calculate/models/user_profile.dart';
-import 'package:calculate/models/activity.dart';
-import 'package:calculate/models/activity_log.dart';
-import 'package:calculate/models/custom_meal.dart';
-import 'package:calculate/models/custom_food.dart';
-import 'package:calculate/models/body_measurement.dart';
-import 'package:calculate/models/water_log.dart';
+import 'package:calculate/models/tables/db_version.dart';
+import 'package:calculate/models/tables/diary_entry.dart';
+import 'package:calculate/models/tables/food.dart';
+import 'package:calculate/models/tables/user_profile.dart';
+import 'package:calculate/models/tables/activity.dart';
+import 'package:calculate/models/tables/activity_log.dart';
+import 'package:calculate/models/tables/custom_meal.dart';
+import 'package:calculate/models/tables/custom_food.dart';
+import 'package:calculate/models/tables/body_measurement.dart';
+import 'package:calculate/models/tables/water_log.dart';
 
 void main() {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
   setUp(() async {
+    // First close existing connections (release file handles), then delete files
+    await FoodDatabase.instance.close();
+    await UserDatabase.instance.close();
     final dbPath = await getDatabasesPath();
     final foodFile = File(p.join(dbPath, 'food.db'));
-    final userFile = File(p.join(dbPath, 'user.db'));
+    final userFile = File(p.join(dbPath, 'app.db'));
     if (await foodFile.exists()) await foodFile.delete();
     if (await userFile.exists()) await userFile.delete();
   });
@@ -35,12 +38,12 @@ void main() {
   test('CRUD operace pro food.db (Dbversion a Food včetně is_used)', () async {
     final foodDb = FoodDatabase.instance;
 
-    //Verze stažené databáze
+    //Version of the downloaded database
     await foodDb.insertDbVersion(
       DbVersion(version: 1),
     );
 
-    //Vložení potraviny ze serverového katalogu
+    //Insertion of food from the server catalog
     final apple = Food(
       id: 101,
       ean: '8590000000012',
@@ -57,7 +60,7 @@ void main() {
     );
     await foodDb.insertFood(apple);
 
-    // READ ověření vložených dat
+    // READ verification of inserted data
     final latestVersion = await foodDb.getLatestDbVersion();
     expect(latestVersion?.version, 1);
 
@@ -65,7 +68,7 @@ void main() {
     expect(loadedFood?.name, 'Jablko Golden');
     expect(loadedFood?.isUsed, false);
 
-    // UPDATE (označení is_used = true a změna názvu)
+    // UPDATE (marking is_used = true and changing name)
     await foodDb.markFoodAsUsed(101, isUsed: true);
     final usedFoods = await foodDb.getUsedFoods();
     expect(usedFoods.length, 1);
@@ -79,11 +82,11 @@ void main() {
     expect(await foodDb.getFoodById(101), isNull);
   });
 
-  test('CRUD operace pro user.db (UserProfile a DiaryEntry)', () async {
+  test('CRUD operace pro app.db (UserProfile a DiaryEntry)', () async {
     final userDb = UserDatabase.instance;
     final foodDb = FoodDatabase.instance;
 
-    // Příprava potraviny ve food.db pro ověření automatického nastavení is_used
+    // Preparing food in food.db to verify automatic setting of is_used
     await foodDb.insertFood(
       Food(
         id: 202,
@@ -100,7 +103,7 @@ void main() {
       ),
     );
 
-//Test pro vlastní potravinu
+//Test for custom food
     final customFoodId = await userDb.insertCustomFood(
       CustomFood(
         name: 'Domácí ovesná tyčinka',
@@ -113,7 +116,7 @@ void main() {
     final customFoods = await userDb.searchCustomFoodsByName('tyčinka');
     expect(customFoods.length, 1);
 
-// Test pro vlastní jídlo
+// Test for custom meal
 final mealId = await userDb.insertCustomMeal(
       CustomMeal(name: 'Svačinový box', totalPortions: 2),
       [
@@ -143,9 +146,9 @@ final mealId = await userDb.insertCustomMeal(
     final portion = await userDb.getPortionNutrition(mealId);
     expect(portion['kcal'], 390.0);
 
-//CRUD testy pro User Profile
+//CRUD tests for User Profile
 
-    // CREATE profilu uživatele
+    // CREATE user profile
     final profileId = await userDb.insertUserProfile(
       UserProfile(
         name: 'Market',
@@ -184,7 +187,7 @@ final mealId = await userDb.insertCustomMeal(
     expect(profile?.dailyKcalGoal, 2100);
     expect(profile?.dailyWaterGoalMl, 2500.0);
 
-// Testy Aktivity
+// Activity Tests
 final runningActivities = await userDb.searchActivitiesByName('Běh');
     expect(runningActivities.length, greaterThanOrEqualTo(3));
 
@@ -211,7 +214,7 @@ final selectedRun = runningActivities.first;
 
 final watchLogId = await userDb.insertActivityLog(
       ActivityLog(
-        activityId: null, // null = vlastní aktivita mimo katalog
+        activityId: null, // null = custom activity outside catalog
         activityName: 'Silový trénink (hodinky)',
         durationMinutes: 50,
         burnedKcal: 340.0,
@@ -246,7 +249,7 @@ final foundActivities = await userDb.searchActivitiesByName('Běh');
     final totalBurned = await userDb.getTotalBurnedKcalByDate('2026-11-15');
     expect(totalBurned, greaterThan(380.0));
 
-// Tělesná měření
+// Body measurements
 await userDb.insertBodyMeasurement(
       BodyMeasurement(date: '2026-11-15', weightKg: 61.8),
     );
@@ -254,13 +257,13 @@ await userDb.insertBodyMeasurement(
     expect(weights.length, 1);
     expect(weights.first.weightKg, 61.8);
 
-// Testy pro DiaryEntry
-    // CREATE DiaryEntry -> mělo by nastavit isUsed = true u potraviny 202
+// Tests for DiaryEntry
+    // CREATE DiaryEntry -> should set isUsed = true for food 202
     final entryId = await userDb.insertDiaryEntry(
       DiaryEntry(
         foodId: 202,
         foodName: 'Ovesné vločky',
-        amountGrams: 80,
+        amount: 80,
         kcal: 296,
         proteinG: 10.4,
         carbsG: 48.0,
@@ -275,14 +278,14 @@ await userDb.insertBodyMeasurement(
     // READ, UPDATE & DELETE DiaryEntry
     var entries = await userDb.getDiaryEntriesByDate('2026-11-12');
     expect(entries.length, 1);
-    expect(entries.first.amountGrams, 80);
+    expect(entries.first.amount, 80);
 
     await userDb.updateDiaryEntry(
       DiaryEntry(
         id: entryId,
         foodId: 202,
         foodName: 'Ovesné vločky',
-        amountGrams: 100,
+        amount: 100,
         kcal: 370,
         proteinG: 13.0,
         carbsG: 60.0,
@@ -291,7 +294,7 @@ await userDb.insertBodyMeasurement(
       ),
     );
     entries = await userDb.getDiaryEntriesByDate('2026-11-12');
-    expect(entries.first.amountGrams, 100);
+    expect(entries.first.amount, 100);
 
     await userDb.deleteDiaryEntry(entryId);
     expect(await userDb.getDiaryEntriesByDate('2026-11-12'), isEmpty);

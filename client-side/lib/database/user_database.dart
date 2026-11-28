@@ -1,14 +1,14 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import '../models/custom_food.dart';
-import '../models/custom_meal.dart';
-import '../models/diary_entry.dart';
-import '../models/user_profile.dart';
-import '../models/activity.dart';
-import '../models/activity_log.dart';
+import '../models/tables/custom_food.dart';
+import '../models/tables/custom_meal.dart';
+import '../models/tables/diary_entry.dart';
+import '../models/tables/user_profile.dart';
+import '../models/tables/activity.dart';
+import '../models/tables/activity_log.dart';
 import 'food_database.dart';
-import '../models/body_measurement.dart';
-import '../models/water_log.dart';
+import '../models/tables/body_measurement.dart';
+import '../models/tables/water_log.dart';
 
 class UserDatabase {
   static final UserDatabase instance = UserDatabase._init();
@@ -18,7 +18,7 @@ class UserDatabase {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('user.db');
+    _database = await _initDB('app.db');
     return _database!;
   }
 
@@ -28,14 +28,74 @@ class UserDatabase {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 3,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
       onCreate: _createDB,
+      onUpgrade: _onUpgrade,
     );
   }
-// vložení základních aktivit do tabulky Activity (možno dále změnit)
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      final cols = await db.rawQuery('PRAGMA table_info(DiaryEntry)');
+      final hasUnit = cols.any((c) => c['name'] == 'unit');
+      if (hasUnit) {
+        await db.transaction((txn) async {
+          await txn.execute('''
+            CREATE TABLE DiaryEntry_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              food_id INTEGER NOT NULL,
+              custom_food_id INTEGER,
+              meal_id INTEGER,
+              food_name TEXT NOT NULL,
+              amount REAL NOT NULL,
+              kcal REAL NOT NULL,
+              protein_g REAL NOT NULL,
+              carbs_g REAL NOT NULL,
+              fat_g REAL NOT NULL,
+              is_fluid_intake INTEGER NOT NULL DEFAULT 0,
+              meal_type TEXT NOT NULL,
+              date TEXT NOT NULL
+            )
+          ''');
+          await txn.execute('''
+            INSERT INTO DiaryEntry_new (
+              id, food_id, custom_food_id, meal_id, food_name, amount,
+              kcal, protein_g, carbs_g, fat_g, is_fluid_intake, meal_type, date
+            )
+            SELECT
+              id, food_id, custom_food_id, meal_id, food_name, amount,
+              kcal, protein_g, carbs_g, fat_g, is_fluid_intake, meal_type, date
+            FROM DiaryEntry
+          ''');
+          await txn.execute('DROP TABLE DiaryEntry');
+          await txn.execute('ALTER TABLE DiaryEntry_new RENAME TO DiaryEntry');
+          await txn.execute(
+            'CREATE INDEX IF NOT EXISTS idx_diary_date ON DiaryEntry (date)',
+          );
+        });
+      }
+    }
+    if (oldVersion < 3) {
+      final cols = await db.rawQuery('PRAGMA table_info(DiaryEntry)');
+      final colNames = cols.map((c) => c['name'] as String).toSet();
+      for (final col in const [
+        'sugars_g',
+        'saturated_fat_g',
+        'fibers_g',
+        'salt_g',
+      ]) {
+        if (!colNames.contains(col)) {
+          await db.execute(
+            'ALTER TABLE DiaryEntry ADD COLUMN $col REAL NOT NULL DEFAULT 0',
+          );
+        }
+      }
+    }
+  }
+// insertion of basic activities into the Activity table (can be modified further)
   Future<void> _seedDefaultActivities(Database db) async {
     final defaultActivities = [
       {'name': 'Běh', 'kcal_per_hour_per_kg': 10.0, 'has_distance': 1},
@@ -121,12 +181,16 @@ await db.execute('''
         custom_food_id INTEGER,
         meal_id INTEGER,
         food_name TEXT NOT NULL,
-        amount_grams REAL NOT NULL,
+        amount REAL NOT NULL,
         kcal REAL NOT NULL,
         protein_g REAL NOT NULL,
         carbs_g REAL NOT NULL,
+        sugars_g REAL NOT NULL DEFAULT 0,
         fat_g REAL NOT NULL,
-        water_ml REAL NOT NULL DEFAULT 0.0,
+        saturated_fat_g REAL NOT NULL DEFAULT 0,
+        fibers_g REAL NOT NULL DEFAULT 0,
+        salt_g REAL NOT NULL DEFAULT 0,
+        is_fluid_intake INTEGER NOT NULL DEFAULT 0,
         meal_type TEXT NOT NULL,
         date TEXT NOT NULL
       )
@@ -183,7 +247,7 @@ await db.execute('''
 
     await db.execute('CREATE INDEX idx_water_date ON WaterLog (date)');
   }
-  // --- CRUD pro CustomFood ---
+  // --- CRUD for CustomFood ---
 
 Future<int> insertCustomFood(CustomFood food) async {
     final db = await database;
@@ -241,7 +305,7 @@ Future<int> insertCustomFood(CustomFood food) async {
     return await db.delete('CustomFood', where: 'id = ?', whereArgs: [id]);
   }
 
-  //CRUD pro CustomMeal
+  //CRUD for CustomMeal
 
   Future<int> insertCustomMeal(
       CustomMeal meal, List<CustomMealIngredient> ingredients) async {
@@ -325,7 +389,7 @@ Future<int> insertCustomFood(CustomFood food) async {
     return await db.delete('CustomMeal', where: 'id = ?', whereArgs: [mealId]);
   }
 
-  // --- CRUD pro UserProfile ---
+  // --- CRUD for UserProfile ---
 
   Future<int> insertUserProfile(UserProfile profile) async {
     final db = await database;
@@ -362,13 +426,18 @@ Future<int> insertCustomFood(CustomFood food) async {
     );
   }
 
-  // --- CRUD pro DiaryEntry ---
+  // --- CRUD for DiaryEntry ---
 
   Future<int> insertDiaryEntry(DiaryEntry entry) async {
     final db = await database;
     final id = await db.insert('DiaryEntry', entry.toMap());
-    // Označí potravinu v food.db jako použitou
-    await FoodDatabase.instance.markFoodAsUsed(entry.foodId, isUsed: true);
+    // Marks the food in food.db as used (only for foods from the catalog).
+    // Best-effort: failure on food.db must not fail an already-saved diary entry.
+    if (entry.customFoodId == null && entry.foodId > 0) {
+      try {
+        await FoodDatabase.instance.markFoodAsUsed(entry.foodId, isUsed: true);
+      } catch (_) {}
+    }
     return id;
   }
 
@@ -402,9 +471,9 @@ Future<int> insertCustomFood(CustomFood food) async {
     );
   }
 
-  // --- CRUD pro Activity ---
+  // --- CRUD for Activity ---
 
-/// Vložení nové aktivity do katalogu
+/// Inserting a new activity into the catalog
   Future<int> insertActivity(Activity activity) async {
     final db = await database;
     return await db.insert(
@@ -414,14 +483,14 @@ Future<int> insertCustomFood(CustomFood food) async {
     );
   }
 
-  /// Načtení všech aktivit z katalogu (seřazeno abecedně)
+  /// Loading all activities from the catalog (sorted alphabetically)
   Future<List<Activity>> getAllActivities() async {
     final db = await database;
     final maps = await db.query('Activity', orderBy: 'name ASC');
     return maps.map((m) => Activity.fromMap(m)).toList();
   }
 
-  /// Vyhledávání v katalogu podle názvu (pro vyhledávací pole v UI)
+  /// Searching the catalog by name (for the search field in UI)
   Future<List<Activity>> searchActivitiesByName(String query) async {
     final db = await database;
     final trimmed = query.trim();
@@ -437,7 +506,7 @@ Future<int> insertCustomFood(CustomFood food) async {
     return maps.map((m) => Activity.fromMap(m)).toList();
   }
 
-  /// Úprava aktivity v katalogu
+  /// Updating an activity in the catalog
   Future<int> updateActivity(Activity activity) async {
     final db = await database;
     return await db.update(
@@ -448,7 +517,7 @@ Future<int> insertCustomFood(CustomFood food) async {
     );
   }
 
-  /// Smazání aktivity z katalogu
+  /// Deleting an activity from the catalog
   Future<int> deleteActivity(int id) async {
     final db = await database;
     return await db.delete(
@@ -458,9 +527,9 @@ Future<int> insertCustomFood(CustomFood food) async {
     );
   }
 
-  // CRUD pro ActivityLog (Zapsané aktivity v deníku uživatele)
+  // CRUD for ActivityLog (Logged activities in the user's diary)
 
-  /// 1. Zápis aktivity vybrané "Ze seznamu" (automaticky spočítá kalorie z profilu)
+  /// 1. Logging an activity selected "From list" (automatically calculates calories from profile)
   Future<int> logCatalogActivity({
     required Activity activity,
     required int durationMinutes,
@@ -490,13 +559,13 @@ Future<int> insertCustomFood(CustomFood food) async {
     return await insertActivityLog(log);
   }
 
-  /// 2. Zápis "Vlastní aktivity" / z hodinek (nebo hotového objektu ActivityLog)
+  /// 2. Logging a "Custom activity" / from watch (or a ready ActivityLog object)
   Future<int> insertActivityLog(ActivityLog log) async {
     final db = await database;
     return await db.insert('ActivityLog', log.toMap());
   }
 
-  /// Načtení všech zapsaných aktivit pro konkrétní den (YYYY-MM-DD)
+  /// Loading all logged activities for a specific day (YYYY-MM-DD)
   Future<List<ActivityLog>> getActivityLogsByDate(String date) async {
     final db = await database;
     final maps = await db.query(
@@ -508,7 +577,7 @@ Future<int> insertCustomFood(CustomFood food) async {
     return maps.map((m) => ActivityLog.fromMap(m)).toList();
   }
 
-  /// Načtení jednoho záznamu z deníku podle ID (např. při otevření úpravy)
+  /// Loading a single diary entry by ID (e.g. when opening for editing)
   Future<ActivityLog?> getActivityLogById(int id) async {
     final db = await database;
     final maps = await db.query(
@@ -521,7 +590,7 @@ Future<int> insertCustomFood(CustomFood food) async {
     return ActivityLog.fromMap(maps.first);
   }
 
-  /// Součet všech spálených kalorií za daný den (katalog + hodinky dohromady)
+  /// Sum of all burned calories for the given day (catalog + watch combined)
   Future<double> getTotalBurnedKcalByDate(String date) async {
     final db = await database;
     final result = await db.rawQuery(
@@ -532,7 +601,7 @@ Future<int> insertCustomFood(CustomFood food) async {
     return total == null ? 0.0 : (total as num).toDouble();
   }
 
-  /// Úprava již zapsané aktivity v deníku (např. změna času, vzdálenosti nebo kcal)
+  /// Updating an already logged activity in the diary (e.g. changing time, distance, or kcal)
   Future<int> updateActivityLog(ActivityLog log) async {
     final db = await database;
     return await db.update(
@@ -543,7 +612,7 @@ Future<int> insertCustomFood(CustomFood food) async {
     );
   }
 
-  /// Smazání zapsané aktivity z deníku
+  /// Deleting a logged activity from the diary
   Future<int> deleteActivityLog(int id) async {
     final db = await database;
     return await db.delete(
@@ -561,7 +630,7 @@ Future<int> insertCustomFood(CustomFood food) async {
     }
   }
 
-  //Crud pro body measurement
+  //Crud for body measurement
   Future<int> insertBodyMeasurement(BodyMeasurement measurement) async {
     final db = await database;
     return await db.insert('BodyMeasurement', measurement.toMap());
@@ -603,7 +672,7 @@ Future<int> insertCustomFood(CustomFood food) async {
     );
   }
 
-  // CRUD pro WaterLog
+  // CRUD for WaterLog
 
   Future<int> insertWaterLog(WaterLog log) async {
     final db = await database;

@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:calculate/service/food_sync_service.dart';
+import 'package:calculate/services/food_sync_service.dart';
 
 Future<void> main() async {
   sqfliteFfiInit();
@@ -30,7 +30,6 @@ Future<void> main() async {
           fibers_g REAL NOT NULL,
           salt_g REAL NOT NULL,
           is_used INTEGER NOT NULL DEFAULT 0,
-          is_custom INTEGER NOT NULL DEFAULT 0,
           is_active INTEGER NOT NULL DEFAULT 1
         )
       ''');

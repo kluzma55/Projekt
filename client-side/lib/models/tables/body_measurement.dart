@@ -1,9 +1,9 @@
 class BodyMeasurement {
   final int? id;
-  final String date;             // Datum měření ve formátu 'YYYY-MM-DD'
-  final double weightKg;         // Aktuální hmotnost v kg
-  final double? bodyFatPercent;  // Volitelné procento tělesného tuku
-  final double? muscleMassKg;    // Volitelná svalová hmota v kg
+  final String date;             // Measurement date in 'YYYY-MM-DD' format
+  final double weightKg;         // Current weight in kg
+  final double? bodyFatPercent;  // Optional body fat percentage
+  final double? muscleMassKg;    // Optional muscle mass in kg
 
   BodyMeasurement({
     this.id,

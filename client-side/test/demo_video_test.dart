@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:calculate/service/food_sync_service.dart';
+import 'package:calculate/services/food_sync_service.dart';
 
 void main() {
   test(
@@ -15,7 +15,7 @@ void main() {
       final dbFile = File(dbPath);
       if (await dbFile.exists()) await dbFile.delete();
 
-      // KROK 1: Prázdná databáze
+      // STEP 1: Empty database
       var db = await openDatabase(
         dbPath,
         version: 1,
@@ -37,7 +37,6 @@ void main() {
               fibers_g REAL NOT NULL,
               salt_g REAL NOT NULL,
               is_used INTEGER NOT NULL DEFAULT 0,
-              is_custom INTEGER NOT NULL DEFAULT 0,
               is_active INTEGER NOT NULL DEFAULT 1
             )
           ''');

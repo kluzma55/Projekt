@@ -11,7 +11,7 @@ class UserProfile {
   final double dailyProteinGoal;
   final double dailyCarbsGoal;
   final double dailyFatGoal;
-  final double dailyWaterGoalMl; // Volitelný cíl pro příjem vody v ml
+  final double dailyWaterGoalMl; // Optional goal for water intake in ml
 
   UserProfile({
     this.id,
@@ -26,7 +26,7 @@ class UserProfile {
     required this.dailyProteinGoal,
     required this.dailyCarbsGoal,
     required this.dailyFatGoal,
-    required this.dailyWaterGoalMl, // Defaultní hodnota pro příjem vody
+    required this.dailyWaterGoalMl, // Default value for water intake
   });
 
   Map<String, dynamic> toMap() {

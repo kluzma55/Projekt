@@ -8,15 +8,15 @@ class FoodSyncService {
 
   FoodSyncService(this.db);
 
-  /// Vrátí aktuální verzi databáze z tabulky Dbversion (0, pokud ještě není nastavena).
+  /// Returns the current database version from the Dbversion table (0 if not set yet).
   Future<int> getCurrentVersion() async {
     final rows = await db.query('Dbversion', limit: 1);
     if (rows.isEmpty) return 0;
     return rows.first['version'] as int;
   }
 
-  /// Rozbalí .db.gz snapshot do dočasného souboru, zkopíruje potraviny do food.db
-  /// a uloží verzi databáze (výchozí 1) do tabulky Dbversion.
+  /// Unpacks a .db.gz snapshot into a temporary file, copies foods and version
+  /// into food.db, and saves the database version into the Dbversion table.
   Future<void> importFromSnapshot(
     String snapshotGzPath, {
     int snapshotVersion = 1,
@@ -26,7 +26,7 @@ class FoodSyncService {
       throw FileSystemException('Snapshot soubor neexistuje', snapshotGzPath);
     }
 
-    // 1. Rozbalení gzip do dočasného .db souboru
+    // 1. Unpack gzip into a temporary .db file
     final compressedBytes = await gzFile.readAsBytes();
     final decompressedBytes = gzip.decode(compressedBytes);
 
@@ -37,10 +37,10 @@ class FoodSyncService {
 
     Database? snapshotDb;
     try {
-      // 2. Otevření rozbaleného snapshotu pouze pro čtení
+      // 2. Open the unpacked snapshot as read-only
       snapshotDb = await openDatabase(tempDbPath, readOnly: true);
 
-      // Zjištění názvu tabulky ve snapshotu (ošetří 'Food', 'food' i 'foods')
+      // Detect food table name in snapshot (handles 'Food', 'food', and 'foods')
       final tables = await snapshotDb.rawQuery(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND LOWER(name) LIKE 'food%'",
       );
@@ -50,39 +50,90 @@ class FoodSyncService {
       final sourceTable = tables.first['name'] as String;
       final snapshotRows = await snapshotDb.query(sourceTable);
 
-      // 3. Zkopírování dat do lokální food.db v jedné transakci
+      // Detect version table in snapshot ('db_version' or 'Dbversion')
+      int resolvedVersion = snapshotVersion;
+      final versionTables = await snapshotDb.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND LOWER(name) IN ('db_version', 'dbversion')",
+      );
+      if (versionTables.isNotEmpty) {
+        final versionRows = await snapshotDb.query(
+          versionTables.first['name'] as String,
+          limit: 1,
+        );
+        if (versionRows.isNotEmpty && versionRows.first['version'] != null) {
+          resolvedVersion = (versionRows.first['version'] as num).toInt();
+        }
+      }
+
+      // 3. Copy data into local food.db in a single transaction, preserving used foods
       await db.transaction((txn) async {
-        // Vyčištění případných starých katalogových dat před importem snapshotu
-        await txn.delete('Food', where: 'is_custom = 0');
+        // Hard-delete only unused catalog rows; keep is_used = 1 rows
+        await txn.delete('Food', where: 'is_used = 0');
+
+        final existingUsedRows = await txn.query(
+          'Food',
+          columns: ['id'],
+          where: 'is_used = 1',
+        );
+        final existingUsedIds =
+            existingUsedRows.map((r) => r['id'] as int).toSet();
+        final snapshotIds = <int>{};
 
         for (final row in snapshotRows) {
-          await txn.insert(
+          final id = (row['id'] as num).toInt();
+          snapshotIds.add(id);
+
+          final fields = <String, dynamic>{
+            'ean': row['ean'] ?? '',
+            'name': row['name'],
+            'unit': row['unit'] ?? 'g',
+            'image_path': row['image_path'] ?? '',
+            'kcal_per_100': (row['kcal_per_100'] as num).toDouble(),
+            'protein_g': (row['protein_g'] as num).toDouble(),
+            'carbs_g': (row['carbs_g'] as num).toDouble(),
+            'sugars_g': (row['sugars_g'] as num).toDouble(),
+            'fat_g': (row['fat_g'] as num).toDouble(),
+            'saturated_fat_g': (row['saturated_fat_g'] as num).toDouble(),
+            'fibers_g': (row['fibers_g'] as num).toDouble(),
+            'salt_g': (row['salt_g'] as num).toDouble(),
+            'is_active': (row['is_active'] as int?) ?? 1,
+          };
+
+          if (existingUsedIds.contains(id)) {
+            // Update in place and preserve is_used = 1
+            await txn.update(
+              'Food',
+              fields,
+              where: 'id = ?',
+              whereArgs: [id],
+            );
+          } else {
+            await txn.insert(
+              'Food',
+              {
+                'id': id,
+                ...fields,
+                'is_used': 0,
+              },
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+          }
+        }
+
+        // Any used food missing from the new snapshot is soft-deleted
+        final removedUsedIds = existingUsedIds.difference(snapshotIds);
+        for (final id in removedUsedIds) {
+          await txn.update(
             'Food',
-            {
-              'id': row['id'],
-              'ean': row['ean'] ?? '',
-              'name': row['name'],
-              'unit': row['unit'],
-              'image_path': row['image_path'] ?? '',
-              'kcal_per_100': (row['kcal_per_100'] as num).toDouble(),
-              'protein_g': (row['protein_g'] as num).toDouble(),
-              'carbs_g': (row['carbs_g'] as num).toDouble(),
-              'sugars_g': (row['sugars_g'] as num).toDouble(),
-              'fat_g': (row['fat_g'] as num).toDouble(),
-              'saturated_fat_g': (row['saturated_fat_g'] as num).toDouble(),
-              'fibers_g': (row['fibers_g'] as num).toDouble(),
-              'salt_g': (row['salt_g'] as num).toDouble(),
-              'is_used': 0,
-              'is_custom': 0,
-              'is_active': row['is_active'] ?? 1,
-            },
-            conflictAlgorithm: ConflictAlgorithm.replace,
+            {'is_active': 0},
+            where: 'id = ?',
+            whereArgs: [id],
           );
         }
 
-        // Nastavení verze databáze v Dbversion
+        // Set database version in Dbversion
         await txn.delete('Dbversion');
-        await txn.insert('Dbversion', {'version': snapshotVersion});
+        await txn.insert('Dbversion', {'version': resolvedVersion});
       });
     } finally {
       await snapshotDb?.close();
@@ -92,8 +143,12 @@ class FoodSyncService {
     }
   }
 
-  /// Aplikuje změny z delta JSON souboru v jedné transakci.
-  /// Při chybě se provede rollback a v databázi se nezmění vůbec nic.
+  /// Applies changes from a delta JSON file in a single transaction.
+  /// On error, rolls back and nothing changes in the database.
+  ///
+  /// For `DELETED`:
+  /// - If `is_used == 0` (`false`): hard-deletes the food from `Food`.
+  /// - If `is_used == 1` (`true`): soft-deletes by setting `is_active = 0`.
   Future<void> applyDelta(String deltaJsonPath) async {
     final jsonFile = File(deltaJsonPath);
     if (!await jsonFile.exists()) {
@@ -111,7 +166,7 @@ class FoodSyncService {
     final List<dynamic> changes = decoded['changes'] as List<dynamic>;
 
     await db.transaction((txn) async {
-      // Ověření návaznosti verze
+      // Verify version continuity
       final versionRows = await txn.query('Dbversion', limit: 1);
       final currentVersion =
           versionRows.isEmpty ? 0 : versionRows.first['version'] as int;
@@ -132,15 +187,30 @@ class FoodSyncService {
 
         switch (action) {
           case 'DELETED':
-            // Soft delete – potravina se nesmaže, pouze se označí jako neaktivní
-            final updatedCount = await txn.update(
+            final existing = await txn.query(
               'Food',
-              {'is_active': 0},
+              columns: ['is_used'],
               where: 'id = ?',
               whereArgs: [foodId],
+              limit: 1,
             );
-            if (updatedCount == 0) {
+            if (existing.isEmpty) {
               throw StateError('Potravina s id=$foodId pro DELETED neexistuje.');
+            }
+            final isUsed = (existing.first['is_used'] as int? ?? 0) == 1;
+            if (isUsed) {
+              await txn.update(
+                'Food',
+                {'is_active': 0},
+                where: 'id = ?',
+                whereArgs: [foodId],
+              );
+            } else {
+              await txn.delete(
+                'Food',
+                where: 'id = ?',
+                whereArgs: [foodId],
+              );
             }
             break;
 
@@ -151,9 +221,8 @@ class FoodSyncService {
                 'Chybějící nebo prázdná data pro UPDATED u id=$foodId.',
               );
             }
-            // Změní se pouze pole uvedená v objektu data
             final updateFields = Map<String, dynamic>.from(rawData);
-            updateFields.remove('id'); // Primární klíč neměníme
+            updateFields.remove('id');
 
             final updatedCount = await txn.update(
               'Food',
@@ -179,7 +248,7 @@ class FoodSyncService {
                 'id': rawData['id'] ?? foodId,
                 'ean': rawData['ean'] ?? '',
                 'name': rawData['name'],
-                'unit': rawData['unit'],
+                'unit': rawData['unit'] ?? 'g',
                 'image_path': rawData['image_path'] ?? '',
                 'kcal_per_100': (rawData['kcal_per_100'] as num).toDouble(),
                 'protein_g': (rawData['protein_g'] as num).toDouble(),
@@ -191,7 +260,6 @@ class FoodSyncService {
                 'fibers_g': (rawData['fibers_g'] as num).toDouble(),
                 'salt_g': (rawData['salt_g'] as num).toDouble(),
                 'is_used': 0,
-                'is_custom': 0,
                 'is_active': 1,
               },
               conflictAlgorithm: ConflictAlgorithm.abort,
@@ -203,7 +271,7 @@ class FoodSyncService {
         }
       }
 
-      // Po úspěšném provedení všech změn uložíme nové číslo verze
+      // After successfully applying all changes, save the new version number
       await txn.delete('Dbversion');
       await txn.insert('Dbversion', {'version': toVersion});
     });

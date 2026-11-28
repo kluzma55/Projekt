@@ -1,7 +1,7 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import '../models/db_version.dart';
-import '../models/food.dart';
+import '../models/tables/db_version.dart';
+import '../models/tables/food.dart';
 
 class FoodDatabase {
   static final FoodDatabase instance = FoodDatabase._init();
@@ -21,12 +21,25 @@ class FoodDatabase {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
       onCreate: _createDB,
+      onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      final cols = await db.rawQuery('PRAGMA table_info(Food)');
+      final hasIsActive = cols.any((c) => c['name'] == 'is_active');
+      if (!hasIsActive) {
+        await db.execute(
+          'ALTER TABLE Food ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1',
+        );
+      }
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -53,6 +66,7 @@ class FoodDatabase {
         fibers_g REAL NOT NULL,
         salt_g REAL NOT NULL,
         is_used INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
         meal_type TEXT NOT NULL DEFAULT 'ostatní',
         updated_in_version_id INTEGER,
         FOREIGN KEY (updated_in_version_id) REFERENCES Dbversion (version)
@@ -63,7 +77,7 @@ class FoodDatabase {
     await db.execute('CREATE INDEX idx_food_name ON Food (name)');
   }
 
-  // --- CRUD pro Dbversion ---
+  // --- CRUD for Dbversion ---
 
 Future<int> insertDbVersion(DbVersion dbVersion) async {
     final db = await database;
@@ -78,7 +92,7 @@ Future<int> insertDbVersion(DbVersion dbVersion) async {
     return DbVersion.fromMap(maps.first);
   }
 
-  // --- CRUD pro Food ---
+  // --- CRUD for Food ---
 
   Future<int> insertFood(Food food) async {
     final db = await database;
@@ -105,11 +119,11 @@ Future<int> insertDbVersion(DbVersion dbVersion) async {
     return Food.fromMap(maps.first);
   }
 
-  Future<List<Food>> getAllFoods({bool onlyActive = true}) async {
+  Future<List<Food>> getAllFoods() async {
     final db = await database;
     final maps = await db.query(
       'Food',
-      where: onlyActive ? 'is_active = 1' : null,
+      where: 'is_active = 1',
       orderBy: 'name ASC',
     );
     return maps.map((m) => Food.fromMap(m)).toList();
